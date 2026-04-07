@@ -3,7 +3,7 @@ import Header from "../components/Header";
 import api from "../services/api";
 
 const initialFormData = {
-  truckNumber: "",
+  truckCode: "",
   driverName: "",
   truckType: "",
   currentLocation: "",
@@ -121,9 +121,9 @@ export default function Trucks() {
           >
             <input
               type="text"
-              name="truckNumber"
-              placeholder="Truck number"
-              value={formData.truckNumber}
+              name="truckCode"
+              placeholder="Truck identifier (e.g., TRK-1001)"
+              value={formData.truckCode}
               onChange={handleChange}
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
             />
@@ -184,7 +184,7 @@ export default function Trucks() {
                   <p className="text-sm font-medium text-red-600">{formError}</p>
                 ) : (
                   <p className="text-sm text-slate-500">
-                    Keep truck numbers unique so each external vehicle can be
+                    Keep truck identifiers unique so each external vehicle can be
                     tracked clearly.
                   </p>
                 )}
@@ -208,7 +208,7 @@ export default function Trucks() {
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left text-slate-600">
                 <tr>
-                  <th className="px-6 py-3">Truck Number</th>
+                  <th className="px-6 py-3">Truck Identifier</th>
                   <th className="px-6 py-3">Driver</th>
                   <th className="px-6 py-3">Truck Type</th>
                   <th className="px-6 py-3">Current Location</th>
@@ -221,7 +221,7 @@ export default function Trucks() {
                 {trucks.map((truck) => (
                   <tr key={truck.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 font-medium">
-                      {truck.truckNumber}
+                      {truck.truckCode}
                     </td>
                     <td className="px-6 py-4">{truck.driverName}</td>
                     <td className="px-6 py-4">{truck.truckType}</td>

@@ -29,6 +29,7 @@ const statusOptions = ["Pending", "Assigned", "In Transit", "Completed"];
 
 export default function Shipments() {
   const [shipments, setShipments] = useState([]);
+  const [availableTrucks, setAvailableTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [formData, setFormData] = useState(initialFormData);
@@ -36,20 +37,33 @@ export default function Shipments() {
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
+  const [assigningTruckId, setAssigningTruckId] = useState(null);
 
   const fetchShipments = async () => {
+    const response = await api.get("/api/shipments");
+    setShipments(response.data);
+  };
+
+  const fetchAvailableTrucks = async () => {
+    const response = await api.get("/api/trucks");
+    const onlyAvailable = response.data.filter(
+      (truck) => truck.availabilityStatus === "Available"
+    );
+    setAvailableTrucks(onlyAvailable);
+  };
+
+  const loadPageData = async () => {
     try {
-      const response = await api.get("/api/shipments");
-      setShipments(response.data);
+      await Promise.all([fetchShipments(), fetchAvailableTrucks()]);
     } catch (error) {
-      console.error("Error fetching shipments:", error);
+      console.error("Error loading shipments page data:", error);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchShipments();
+    loadPageData();
   }, []);
 
   const formatCurrency = (amountInBdt) => {
@@ -100,7 +114,7 @@ export default function Shipments() {
       });
 
       setFormData(initialFormData);
-      await fetchShipments();
+      await loadPageData();
     } catch (error) {
       console.error("Error creating shipment:", error);
       setFormError(
@@ -115,12 +129,29 @@ export default function Shipments() {
     try {
       setUpdatingStatusId(id);
       await api.patch(`/api/shipments/${id}/status`, { status: newStatus });
-      await fetchShipments();
+      await loadPageData();
     } catch (error) {
       console.error("Error updating shipment status:", error);
       alert(error.response?.data?.error || "Failed to update shipment status");
     } finally {
       setUpdatingStatusId(null);
+    }
+  };
+
+  const handleAssignTruck = async (shipmentId, truckId) => {
+    if (!truckId) return;
+
+    try {
+      setAssigningTruckId(shipmentId);
+      await api.patch(`/api/shipments/${shipmentId}/assign-truck`, {
+        truckId: Number(truckId),
+      });
+      await loadPageData();
+    } catch (error) {
+      console.error("Error assigning truck:", error);
+      alert(error.response?.data?.error || "Failed to assign truck");
+    } finally {
+      setAssigningTruckId(null);
     }
   };
 
@@ -134,7 +165,7 @@ export default function Shipments() {
     try {
       setDeletingId(id);
       await api.delete(`/api/shipments/${id}`);
-      await fetchShipments();
+      await loadPageData();
     } catch (error) {
       console.error("Error deleting shipment:", error);
       alert(error.response?.data?.error || "Failed to delete shipment");
@@ -152,8 +183,8 @@ export default function Shipments() {
           <div>
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="mt-2 text-slate-600">
-              Manage shipment requests, track routes, and review negotiated
-              pricing across brokerage operations.
+              Manage shipment requests, track routes, assign trucks, and review
+              negotiated pricing across brokerage operations.
             </p>
           </div>
 
@@ -295,7 +326,8 @@ export default function Shipments() {
                   <th className="px-6 py-3">Client</th>
                   <th className="px-6 py-3">Route</th>
                   <th className="px-6 py-3">Date</th>
-                  <th className="px-6 py-3">Truck</th>
+                  <th className="px-6 py-3">Truck Type</th>
+                  <th className="px-6 py-3">Assigned Truck</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Price</th>
                   <th className="px-6 py-3">Commission</th>
@@ -317,6 +349,32 @@ export default function Shipments() {
                     <td className="px-6 py-4">{shipment.shipmentDate}</td>
 
                     <td className="px-6 py-4">{shipment.truckType}</td>
+
+                    <td className="px-6 py-4">
+                      {shipment.assignedTruckCode ? (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                          {shipment.assignedTruckCode}
+                        </span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            defaultValue=""
+                            onChange={(e) =>
+                              handleAssignTruck(shipment.id, e.target.value)
+                            }
+                            disabled={assigningTruckId === shipment.id}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            <option value="">Assign truck</option>
+                            {availableTrucks.map((truck) => (
+                              <option key={truck.id} value={truck.id}>
+                                {truck.truckCode}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </td>
 
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

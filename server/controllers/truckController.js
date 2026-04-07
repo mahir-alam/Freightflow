@@ -5,7 +5,7 @@ const getAllTrucks = async (req, res) => {
     const result = await pool.query(`
       SELECT
         id,
-        truck_number AS "truckNumber",
+        truck_number AS "truckCode",
         driver_name AS "driverName",
         truck_type AS "truckType",
         current_location AS "currentLocation",
@@ -25,7 +25,7 @@ const getAllTrucks = async (req, res) => {
 const createTruck = async (req, res) => {
   try {
     const {
-      truckNumber,
+      truckCode,
       driverName,
       truckType,
       currentLocation,
@@ -34,7 +34,7 @@ const createTruck = async (req, res) => {
     } = req.body;
 
     if (
-      !truckNumber ||
+      !truckCode ||
       !driverName ||
       !truckType ||
       !currentLocation ||
@@ -57,7 +57,7 @@ const createTruck = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING
         id,
-        truck_number AS "truckNumber",
+        truck_number AS "truckCode",
         driver_name AS "driverName",
         truck_type AS "truckType",
         current_location AS "currentLocation",
@@ -65,7 +65,7 @@ const createTruck = async (req, res) => {
         capacity_tons AS "capacityTons";
       `,
       [
-        truckNumber,
+        truckCode,
         driverName,
         truckType,
         currentLocation,
@@ -104,7 +104,7 @@ const updateTruckAvailability = async (req, res) => {
       WHERE id = $2
       RETURNING
         id,
-        truck_number AS "truckNumber",
+        truck_number AS "truckCode",
         driver_name AS "driverName",
         truck_type AS "truckType",
         current_location AS "currentLocation",
