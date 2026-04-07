@@ -42,9 +42,28 @@ const getNextStatusOptions = (currentStatus) => {
   }
 };
 
+const getRecommendationLabel = (truck, shipment) => {
+  if (
+    truck.truckType === shipment.truckType &&
+    truck.currentLocation === shipment.pickupLocation
+  ) {
+    return "Best match";
+  }
+
+  if (truck.truckType === shipment.truckType) {
+    return "Type match";
+  }
+
+  if (truck.currentLocation === shipment.pickupLocation) {
+    return "Location match";
+  }
+
+  return "Available fallback";
+};
+
 export default function Shipments() {
   const [shipments, setShipments] = useState([]);
-  const [availableTrucks, setAvailableTrucks] = useState([]);
+  const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [formData, setFormData] = useState(initialFormData);
@@ -57,19 +76,53 @@ export default function Shipments() {
   const fetchShipments = async () => {
     const response = await api.get("/api/shipments");
     setShipments(response.data);
+    return response.data;
   };
 
-  const fetchAvailableTrucks = async () => {
-    const response = await api.get("/api/trucks");
-    const onlyAvailable = response.data.filter(
-      (truck) => truck.availabilityStatus === "Available"
-    );
-    setAvailableTrucks(onlyAvailable);
+  const fetchRecommendationsForPendingShipments = async (shipmentList) => {
+    try {
+      const pendingShipments = shipmentList.filter(
+        (shipment) => shipment.status === "Pending" && !shipment.assignedTruckCode
+      );
+
+      const recommendationResults = await Promise.all(
+        pendingShipments.map(async (shipment) => {
+          try {
+            const response = await api.get(
+              `/api/shipments/${shipment.id}/recommend-trucks`
+            );
+            return {
+              shipmentId: shipment.id,
+              trucks: response.data,
+            };
+          } catch (error) {
+            console.error(
+              `Error fetching recommendations for shipment ${shipment.id}:`,
+              error
+            );
+            return {
+              shipmentId: shipment.id,
+              trucks: [],
+            };
+          }
+        })
+      );
+
+      const mappedRecommendations = {};
+      recommendationResults.forEach((item) => {
+        mappedRecommendations[item.shipmentId] = item.trucks;
+      });
+
+      setRecommendedTrucksByShipment(mappedRecommendations);
+    } catch (error) {
+      console.error("Error fetching truck recommendations:", error);
+    }
   };
 
   const loadPageData = async () => {
     try {
-      await Promise.all([fetchShipments(), fetchAvailableTrucks()]);
+      const shipmentList = await fetchShipments();
+      await fetchRecommendationsForPendingShipments(shipmentList);
     } catch (error) {
       console.error("Error loading shipments page data:", error);
     } finally {
@@ -103,6 +156,19 @@ export default function Shipments() {
         return "bg-purple-50 text-purple-700";
       case "Completed":
         return "bg-emerald-50 text-emerald-700";
+      default:
+        return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const getRecommendationBadgeClasses = (label) => {
+    switch (label) {
+      case "Best match":
+        return "bg-emerald-50 text-emerald-700";
+      case "Type match":
+        return "bg-blue-50 text-blue-700";
+      case "Location match":
+        return "bg-amber-50 text-amber-700";
       default:
         return "bg-slate-100 text-slate-700";
     }
@@ -345,6 +411,7 @@ export default function Shipments() {
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Truck Type</th>
                   <th className="px-6 py-3">Assigned Truck</th>
+                  <th className="px-6 py-3">Recommended Trucks</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Price</th>
                   <th className="px-6 py-3">Commission</th>
@@ -353,99 +420,147 @@ export default function Shipments() {
               </thead>
 
               <tbody>
-                {shipments.map((shipment) => (
-                  <tr key={shipment.id} className="border-t border-slate-200">
-                    <td className="px-6 py-4 font-medium">
-                      {shipment.clientName}
-                    </td>
+                {shipments.map((shipment) => {
+                  const recommendedTrucks =
+                    recommendedTrucksByShipment[shipment.id] || [];
 
-                    <td className="px-6 py-4">
-                      {shipment.pickupLocation} → {shipment.dropoffLocation}
-                    </td>
+                  return (
+                    <tr key={shipment.id} className="border-t border-slate-200 align-top">
+                      <td className="px-6 py-4 font-medium">
+                        {shipment.clientName}
+                      </td>
 
-                    <td className="px-6 py-4">{shipment.shipmentDate}</td>
+                      <td className="px-6 py-4">
+                        {shipment.pickupLocation} → {shipment.dropoffLocation}
+                      </td>
 
-                    <td className="px-6 py-4">{shipment.truckType}</td>
+                      <td className="px-6 py-4">{shipment.shipmentDate}</td>
 
-                    <td className="px-6 py-4">
-                      {shipment.assignedTruckCode ? (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                          {shipment.assignedTruckCode}
-                        </span>
-                      ) : shipment.status === "Pending" ? (
-                        <select
-                          defaultValue=""
-                          onChange={(e) =>
-                            handleAssignTruck(shipment.id, e.target.value)
-                          }
-                          disabled={assigningTruckId === shipment.id}
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          <option value="">Assign truck</option>
-                          {availableTrucks.map((truck) => (
-                            <option key={truck.id} value={truck.id}>
-                              {truck.truckCode}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="text-xs text-slate-400">Unassigned</span>
-                      )}
-                    </td>
+                      <td className="px-6 py-4">{shipment.truckType}</td>
 
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
-                            shipment.status
-                          )}`}
-                        >
-                          {shipment.status}
-                        </span>
+                      <td className="px-6 py-4">
+                        {shipment.assignedTruckCode ? (
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                            {shipment.assignedTruckCode}
+                          </span>
+                        ) : shipment.status === "Pending" ? (
+                          <select
+                            defaultValue=""
+                            onChange={(e) =>
+                              handleAssignTruck(shipment.id, e.target.value)
+                            }
+                            disabled={assigningTruckId === shipment.id}
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            <option value="">Assign truck</option>
+                            {recommendedTrucks.map((truck) => (
+                              <option key={truck.id} value={truck.id}>
+                                {truck.truckCode}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs text-slate-400">Unassigned</span>
+                        )}
+                      </td>
 
-                        <select
-                          value={shipment.status}
-                          onChange={(e) =>
-                            handleStatusChange(
-                              shipment.id,
-                              e.target.value,
+                      <td className="px-6 py-4">
+                        {shipment.status === "Pending" && !shipment.assignedTruckCode ? (
+                          recommendedTrucks.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                              {recommendedTrucks.slice(0, 3).map((truck) => {
+                                const label = getRecommendationLabel(truck, shipment);
+
+                                return (
+                                  <div
+                                    key={truck.id}
+                                    className="flex flex-col rounded-xl bg-slate-50 p-3"
+                                  >
+                                    <div className="flex items-center justify-between gap-2">
+                                      <span className="text-xs font-semibold text-slate-800">
+                                        {truck.truckCode}
+                                      </span>
+                                      <span
+                                        className={`rounded-full px-2 py-1 text-[10px] font-medium ${getRecommendationBadgeClasses(
+                                          label
+                                        )}`}
+                                      >
+                                        {label}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[11px] text-slate-500">
+                                      {truck.truckType} • {truck.currentLocation}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              No available recommendations
+                            </span>
+                          )
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            Not needed
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
                               shipment.status
-                            )
-                          }
-                          disabled={
-                            updatingStatusId === shipment.id ||
-                            shipment.status === "Completed"
-                          }
-                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                            )}`}
+                          >
+                            {shipment.status}
+                          </span>
+
+                          <select
+                            value={shipment.status}
+                            onChange={(e) =>
+                              handleStatusChange(
+                                shipment.id,
+                                e.target.value,
+                                shipment.status
+                              )
+                            }
+                            disabled={
+                              updatingStatusId === shipment.id ||
+                              shipment.status === "Completed"
+                            }
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {getNextStatusOptions(shipment.status).map((statusOption) => (
+                              <option key={statusOption} value={statusOption}>
+                                {statusOption}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {formatCurrency(shipment.negotiatedPrice)}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {formatCurrency(shipment.commissionAmount)}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleDelete(shipment.id)}
+                          disabled={deletingId === shipment.id}
+                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                          {getNextStatusOptions(shipment.status).map((statusOption) => (
-                            <option key={statusOption} value={statusOption}>
-                              {statusOption}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {formatCurrency(shipment.negotiatedPrice)}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {formatCurrency(shipment.commissionAmount)}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleDelete(shipment.id)}
-                        disabled={deletingId === shipment.id}
-                        className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {deletingId === shipment.id ? "Deleting..." : "Delete"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                          {deletingId === shipment.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

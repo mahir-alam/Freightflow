@@ -296,6 +296,67 @@ const assignTruckToShipment = async (req, res) => {
   }
 };
 
+const getRecommendedTrucksForShipment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const shipmentResult = await pool.query(
+      `
+      SELECT id, truck_type, pickup_location, status, assigned_truck_id
+      FROM shipments
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    if (shipmentResult.rowCount === 0) {
+      return res.status(404).json({ error: "Shipment not found" });
+    }
+
+    const shipment = shipmentResult.rows[0];
+
+    if (shipment.status !== "Pending") {
+      return res.status(400).json({
+        error: "Recommendations are only available for pending shipments",
+      });
+    }
+
+    if (shipment.assigned_truck_id) {
+      return res.status(400).json({
+        error: "Shipment already has an assigned truck",
+      });
+    }
+
+    const truckResult = await pool.query(
+      `
+      SELECT
+        id,
+        truck_number AS "truckCode",
+        driver_name AS "driverName",
+        truck_type AS "truckType",
+        current_location AS "currentLocation",
+        availability_status AS "availabilityStatus",
+        capacity_tons AS "capacityTons",
+        CASE
+          WHEN truck_type = $1 AND current_location = $2 THEN 1
+          WHEN truck_type = $1 THEN 2
+          WHEN current_location = $2 THEN 3
+          ELSE 4
+        END AS recommendation_rank
+      FROM trucks
+      WHERE availability_status = 'Available'
+      ORDER BY recommendation_rank ASC, id DESC
+      `,
+      [shipment.truck_type, shipment.pickup_location]
+    );
+
+    res.json(truckResult.rows);
+  } catch (error) {
+    console.error("Error fetching recommended trucks:", error.message);
+    res.status(500).json({ error: "Failed to fetch recommended trucks" });
+  }
+};
+
 const deleteShipment = async (req, res) => {
   const client = await pool.connect();
 
@@ -356,5 +417,6 @@ module.exports = {
   createShipment,
   updateShipmentStatus,
   assignTruckToShipment,
+  getRecommendedTrucksForShipment,
   deleteShipment,
 };
