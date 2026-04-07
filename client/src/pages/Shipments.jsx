@@ -14,28 +14,42 @@ const currencySymbols = {
   CAD: "C$",
 };
 
+const initialFormData = {
+  clientName: "",
+  pickupLocation: "",
+  dropoffLocation: "",
+  shipmentDate: "",
+  truckType: "",
+  status: "Pending",
+  negotiatedPrice: "",
+  commissionAmount: "",
+};
+
 export default function Shipments() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
+  const [formData, setFormData] = useState(initialFormData);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const fetchShipments = async () => {
+    try {
+      const response = await api.get("/api/shipments");
+      setShipments(response.data);
+    } catch (error) {
+      console.error("Error fetching shipments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        const response = await api.get("/api/shipments");
-        setShipments(response.data);
-      } catch (error) {
-        console.error("Error fetching shipments:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchShipments();
   }, []);
 
   const formatCurrency = (amountInBdt) => {
-    const convertedAmount = amountInBdt * currencyRates[currency];
+    const convertedAmount = Number(amountInBdt) * currencyRates[currency];
 
     return `${currencySymbols[currency]}${convertedAmount.toLocaleString(
       undefined,
@@ -58,6 +72,38 @@ export default function Shipments() {
         return "bg-emerald-50 text-emerald-700";
       default:
         return "bg-slate-100 text-slate-700";
+    }
+  };
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError("");
+
+    try {
+      await api.post("/api/shipments", {
+        ...formData,
+        negotiatedPrice: Number(formData.negotiatedPrice),
+        commissionAmount: Number(formData.commissionAmount),
+      });
+
+      setFormData(initialFormData);
+      await fetchShipments();
+    } catch (error) {
+      console.error("Error creating shipment:", error);
+      setFormError(
+        error.response?.data?.error || "Failed to create shipment"
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -95,6 +141,113 @@ export default function Shipments() {
           </div>
         </div>
 
+        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-xl font-semibold">Create Shipment</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Add a new shipment request into the brokerage workflow.
+          </p>
+
+          <form
+            onSubmit={handleSubmit}
+            className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
+          >
+            <input
+              type="text"
+              name="clientName"
+              placeholder="Client name"
+              value={formData.clientName}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <input
+              type="text"
+              name="pickupLocation"
+              placeholder="Pickup location"
+              value={formData.pickupLocation}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <input
+              type="text"
+              name="dropoffLocation"
+              placeholder="Dropoff location"
+              value={formData.dropoffLocation}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <input
+              type="date"
+              name="shipmentDate"
+              value={formData.shipmentDate}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <input
+              type="text"
+              name="truckType"
+              placeholder="Truck type"
+              value={formData.truckType}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            >
+              <option value="Pending">Pending</option>
+              <option value="Assigned">Assigned</option>
+              <option value="In Transit">In Transit</option>
+              <option value="Completed">Completed</option>
+            </select>
+
+            <input
+              type="number"
+              name="negotiatedPrice"
+              placeholder="Negotiated price (BDT)"
+              value={formData.negotiatedPrice}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <input
+              type="number"
+              name="commissionAmount"
+              placeholder="Commission amount (BDT)"
+              value={formData.commissionAmount}
+              onChange={handleChange}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            />
+
+            <div className="md:col-span-2 xl:col-span-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                {formError ? (
+                  <p className="text-sm font-medium text-red-600">{formError}</p>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Prices are stored in BDT and displayed in your selected
+                    currency.
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {submitting ? "Creating..." : "Create Shipment"}
+              </button>
+            </div>
+          </form>
+        </section>
+
         {loading ? (
           <p className="text-slate-600">Loading shipments...</p>
         ) : (
@@ -114,10 +267,7 @@ export default function Shipments() {
 
               <tbody>
                 {shipments.map((shipment) => (
-                  <tr
-                    key={shipment.id}
-                    className="border-t border-slate-200"
-                  >
+                  <tr key={shipment.id} className="border-t border-slate-200">
                     <td className="px-6 py-4 font-medium">
                       {shipment.clientName}
                     </td>
