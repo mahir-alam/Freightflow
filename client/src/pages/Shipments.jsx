@@ -25,6 +25,8 @@ const initialFormData = {
   commissionAmount: "",
 };
 
+const statusOptions = ["Pending", "Assigned", "In Transit", "Completed"];
+
 export default function Shipments() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +35,7 @@ export default function Shipments() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
+  const [updatingStatusId, setUpdatingStatusId] = useState(null);
 
   const fetchShipments = async () => {
     try {
@@ -105,6 +108,19 @@ export default function Shipments() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      setUpdatingStatusId(id);
+      await api.patch(`/api/shipments/${id}/status`, { status: newStatus });
+      await fetchShipments();
+    } catch (error) {
+      console.error("Error updating shipment status:", error);
+      alert(error.response?.data?.error || "Failed to update shipment status");
+    } finally {
+      setUpdatingStatusId(null);
     }
   };
 
@@ -221,10 +237,11 @@ export default function Shipments() {
               onChange={handleChange}
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
             >
-              <option value="Pending">Pending</option>
-              <option value="Assigned">Assigned</option>
-              <option value="In Transit">In Transit</option>
-              <option value="Completed">Completed</option>
+              {statusOptions.map((statusOption) => (
+                <option key={statusOption} value={statusOption}>
+                  {statusOption}
+                </option>
+              ))}
             </select>
 
             <input
@@ -302,13 +319,30 @@ export default function Shipments() {
                     <td className="px-6 py-4">{shipment.truckType}</td>
 
                     <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
-                          shipment.status
-                        )}`}
-                      >
-                        {shipment.status}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
+                            shipment.status
+                          )}`}
+                        >
+                          {shipment.status}
+                        </span>
+
+                        <select
+                          value={shipment.status}
+                          onChange={(e) =>
+                            handleStatusChange(shipment.id, e.target.value)
+                          }
+                          disabled={updatingStatusId === shipment.id}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {statusOptions.map((statusOption) => (
+                            <option key={statusOption} value={statusOption}>
+                              {statusOption}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </td>
 
                     <td className="px-6 py-4">

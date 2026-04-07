@@ -93,6 +93,47 @@ const createShipment = async (req, res) => {
   }
 };
 
+const updateShipmentStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid shipment status" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE shipments
+      SET status = $1
+      WHERE id = $2
+      RETURNING
+        id,
+        client_name AS "clientName",
+        pickup_location AS "pickupLocation",
+        dropoff_location AS "dropoffLocation",
+        shipment_date AS "shipmentDate",
+        truck_type AS "truckType",
+        status,
+        negotiated_price_bdt AS "negotiatedPrice",
+        commission_amount_bdt AS "commissionAmount";
+      `,
+      [status, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Shipment not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating shipment status:", error.message);
+    res.status(500).json({ error: "Failed to update shipment status" });
+  }
+};
+
 const deleteShipment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -120,5 +161,6 @@ const deleteShipment = async (req, res) => {
 module.exports = {
   getAllShipments,
   createShipment,
+  updateShipmentStatus,
   deleteShipment,
 };
