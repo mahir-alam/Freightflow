@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const healthRoutes = require("./routes/healthRoutes");
 const shipmentRoutes = require("./routes/shipmentRoutes");
+const truckRoutes = require("./routes/truckRoutes");
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 
 app.use("/", healthRoutes);
 app.use("/api/shipments", shipmentRoutes);
+app.use("/api/trucks", truckRoutes);
 
 const PORT = process.env.PORT || 5000;
 
