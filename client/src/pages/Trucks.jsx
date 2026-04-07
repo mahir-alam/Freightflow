@@ -32,6 +32,7 @@ export default function Trucks() {
   const [formData, setFormData] = useState(initialFormData);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [updatingTruckId, setUpdatingTruckId] = useState(null);
 
   const fetchTrucks = async () => {
     try {
@@ -74,6 +75,23 @@ export default function Trucks() {
       setFormError(error.response?.data?.error || "Failed to create truck");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAvailabilityChange = async (id, newAvailability) => {
+    try {
+      setUpdatingTruckId(id);
+      await api.patch(`/api/trucks/${id}/availability`, {
+        availabilityStatus: newAvailability,
+      });
+      await fetchTrucks();
+    } catch (error) {
+      console.error("Error updating truck availability:", error);
+      alert(
+        error.response?.data?.error || "Failed to update truck availability"
+      );
+    } finally {
+      setUpdatingTruckId(null);
     }
   };
 
@@ -209,13 +227,30 @@ export default function Trucks() {
                     <td className="px-6 py-4">{truck.truckType}</td>
                     <td className="px-6 py-4">{truck.currentLocation}</td>
                     <td className="px-6 py-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-medium ${getAvailabilityClasses(
-                          truck.availabilityStatus
-                        )}`}
-                      >
-                        {truck.availabilityStatus}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-medium ${getAvailabilityClasses(
+                            truck.availabilityStatus
+                          )}`}
+                        >
+                          {truck.availabilityStatus}
+                        </span>
+
+                        <select
+                          value={truck.availabilityStatus}
+                          onChange={(e) =>
+                            handleAvailabilityChange(truck.id, e.target.value)
+                          }
+                          disabled={updatingTruckId === truck.id}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {availabilityOptions.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </td>
                     <td className="px-6 py-4">{truck.capacityTons}</td>
                   </tr>

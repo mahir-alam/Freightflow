@@ -86,7 +86,47 @@ const createTruck = async (req, res) => {
   }
 };
 
+const updateTruckAvailability = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { availabilityStatus } = req.body;
+
+    const allowedStatuses = ["Available", "Assigned", "Unavailable"];
+
+    if (!allowedStatuses.includes(availabilityStatus)) {
+      return res.status(400).json({ error: "Invalid availability status" });
+    }
+
+    const result = await pool.query(
+      `
+      UPDATE trucks
+      SET availability_status = $1
+      WHERE id = $2
+      RETURNING
+        id,
+        truck_number AS "truckNumber",
+        driver_name AS "driverName",
+        truck_type AS "truckType",
+        current_location AS "currentLocation",
+        availability_status AS "availabilityStatus",
+        capacity_tons AS "capacityTons";
+      `,
+      [availabilityStatus, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Truck not found" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Error updating truck availability:", error.message);
+    res.status(500).json({ error: "Failed to update truck availability" });
+  }
+};
+
 module.exports = {
   getAllTrucks,
   createTruck,
+  updateTruckAvailability,
 };
