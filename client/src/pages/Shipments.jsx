@@ -27,6 +27,21 @@ const initialFormData = {
 
 const statusOptions = ["Pending", "Assigned", "In Transit", "Completed"];
 
+const getNextStatusOptions = (currentStatus) => {
+  switch (currentStatus) {
+    case "Pending":
+      return ["Pending", "Assigned"];
+    case "Assigned":
+      return ["Assigned", "In Transit"];
+    case "In Transit":
+      return ["In Transit", "Completed"];
+    case "Completed":
+      return ["Completed"];
+    default:
+      return [currentStatus];
+  }
+};
+
 export default function Shipments() {
   const [shipments, setShipments] = useState([]);
   const [availableTrucks, setAvailableTrucks] = useState([]);
@@ -125,7 +140,9 @@ export default function Shipments() {
     }
   };
 
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id, newStatus, currentStatus) => {
+    if (newStatus === currentStatus) return;
+
     try {
       setUpdatingStatusId(id);
       await api.patch(`/api/shipments/${id}/status`, { status: newStatus });
@@ -355,24 +372,24 @@ export default function Shipments() {
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                           {shipment.assignedTruckCode}
                         </span>
+                      ) : shipment.status === "Pending" ? (
+                        <select
+                          defaultValue=""
+                          onChange={(e) =>
+                            handleAssignTruck(shipment.id, e.target.value)
+                          }
+                          disabled={assigningTruckId === shipment.id}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          <option value="">Assign truck</option>
+                          {availableTrucks.map((truck) => (
+                            <option key={truck.id} value={truck.id}>
+                              {truck.truckCode}
+                            </option>
+                          ))}
+                        </select>
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <select
-                            defaultValue=""
-                            onChange={(e) =>
-                              handleAssignTruck(shipment.id, e.target.value)
-                            }
-                            disabled={assigningTruckId === shipment.id}
-                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            <option value="">Assign truck</option>
-                            {availableTrucks.map((truck) => (
-                              <option key={truck.id} value={truck.id}>
-                                {truck.truckCode}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        <span className="text-xs text-slate-400">Unassigned</span>
                       )}
                     </td>
 
@@ -389,12 +406,19 @@ export default function Shipments() {
                         <select
                           value={shipment.status}
                           onChange={(e) =>
-                            handleStatusChange(shipment.id, e.target.value)
+                            handleStatusChange(
+                              shipment.id,
+                              e.target.value,
+                              shipment.status
+                            )
                           }
-                          disabled={updatingStatusId === shipment.id}
+                          disabled={
+                            updatingStatusId === shipment.id ||
+                            shipment.status === "Completed"
+                          }
                           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
                         >
-                          {statusOptions.map((statusOption) => (
+                          {getNextStatusOptions(shipment.status).map((statusOption) => (
                             <option key={statusOption} value={statusOption}>
                               {statusOption}
                             </option>

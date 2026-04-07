@@ -53,6 +53,12 @@ const createShipment = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
+
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid shipment status" });
+    }
+
     const result = await pool.query(
       `
       INSERT INTO shipments (
@@ -110,7 +116,7 @@ const updateShipmentStatus = async (req, res) => {
 
     const currentShipmentResult = await pool.query(
       `
-      SELECT assigned_truck_id
+      SELECT id, status, assigned_truck_id
       FROM shipments
       WHERE id = $1
       `,
@@ -121,7 +127,22 @@ const updateShipmentStatus = async (req, res) => {
       return res.status(404).json({ error: "Shipment not found" });
     }
 
-    const assignedTruckId = currentShipmentResult.rows[0].assigned_truck_id;
+    const currentShipment = currentShipmentResult.rows[0];
+    const currentStatus = currentShipment.status;
+    const assignedTruckId = currentShipment.assigned_truck_id;
+
+    const allowedTransitions = {
+      Pending: ["Assigned"],
+      Assigned: ["In Transit"],
+      "In Transit": ["Completed"],
+      Completed: [],
+    };
+
+    if (!allowedTransitions[currentStatus].includes(status)) {
+      return res.status(400).json({
+        error: `Cannot change shipment status from ${currentStatus} to ${status}`,
+      });
+    }
 
     const result = await pool.query(
       `
@@ -175,13 +196,33 @@ const assignTruckToShipment = async (req, res) => {
     await client.query("BEGIN");
 
     const shipmentResult = await client.query(
-      `SELECT id FROM shipments WHERE id = $1`,
+      `
+      SELECT id, status, assigned_truck_id
+      FROM shipments
+      WHERE id = $1
+      `,
       [id]
     );
 
     if (shipmentResult.rowCount === 0) {
       await client.query("ROLLBACK");
       return res.status(404).json({ error: "Shipment not found" });
+    }
+
+    const shipment = shipmentResult.rows[0];
+
+    if (shipment.status !== "Pending") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Only pending shipments can be assigned a truck",
+      });
+    }
+
+    if (shipment.assigned_truck_id) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Shipment already has an assigned truck",
+      });
     }
 
     const truckResult = await client.query(
