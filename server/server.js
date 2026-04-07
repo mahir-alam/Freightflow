@@ -2,14 +2,14 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const healthRoutes = require("./routes/healthRoutes");
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.json({ message: "FreightFlow API is running" });
-});
+app.use("/", healthRoutes);
 
 const PORT = process.env.PORT || 5000;
 
