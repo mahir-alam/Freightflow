@@ -6,6 +6,7 @@ const healthRoutes = require("./routes/healthRoutes");
 const shipmentRoutes = require("./routes/shipmentRoutes");
 const truckRoutes = require("./routes/truckRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use("/", healthRoutes);
 app.use("/api/shipments", shipmentRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/analytics", analyticsRoutes);
 
 const PORT = process.env.PORT || 5000;
 
