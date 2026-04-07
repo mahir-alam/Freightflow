@@ -32,6 +32,7 @@ export default function Shipments() {
   const [formData, setFormData] = useState(initialFormData);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchShipments = async () => {
     try {
@@ -104,6 +105,25 @@ export default function Shipments() {
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this shipment?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingId(id);
+      await api.delete(`/api/shipments/${id}`);
+      await fetchShipments();
+    } catch (error) {
+      console.error("Error deleting shipment:", error);
+      alert(error.response?.data?.error || "Failed to delete shipment");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -262,6 +282,7 @@ export default function Shipments() {
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Price</th>
                   <th className="px-6 py-3">Commission</th>
+                  <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
 
@@ -296,6 +317,16 @@ export default function Shipments() {
 
                     <td className="px-6 py-4">
                       {formatCurrency(shipment.commissionAmount)}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <button
+                        onClick={() => handleDelete(shipment.id)}
+                        disabled={deletingId === shipment.id}
+                        className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {deletingId === shipment.id ? "Deleting..." : "Delete"}
+                      </button>
                     </td>
                   </tr>
                 ))}

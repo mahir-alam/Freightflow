@@ -93,7 +93,32 @@ const createShipment = async (req, res) => {
   }
 };
 
+const deleteShipment = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      `
+      DELETE FROM shipments
+      WHERE id = $1
+      RETURNING id;
+      `,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Shipment not found" });
+    }
+
+    res.json({ message: "Shipment deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting shipment:", error.message);
+    res.status(500).json({ error: "Failed to delete shipment" });
+  }
+};
+
 module.exports = {
   getAllShipments,
   createShipment,
+  deleteShipment,
 };
