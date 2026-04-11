@@ -2,24 +2,52 @@ const pool = require("../config/db");
 
 const getAllShipments = async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        s.id,
-        s.client_name AS "clientName",
-        s.pickup_location AS "pickupLocation",
-        s.dropoff_location AS "dropoffLocation",
-        s.shipment_date AS "shipmentDate",
-        s.truck_type AS "truckType",
-        s.status,
-        s.negotiated_price_bdt AS "negotiatedPrice",
-        s.commission_amount_bdt AS "commissionAmount",
-        s.assigned_truck_id AS "assignedTruckId",
-        t.truck_number AS "assignedTruckCode"
-      FROM shipments s
-      LEFT JOIN trucks t ON s.assigned_truck_id = t.id
-      ORDER BY s.shipment_date DESC, s.id DESC;
-    `);
+    let query = "";
+    let values = [];
 
+    if (req.user.role === "admin") {
+      query = `
+        SELECT 
+          s.id,
+          s.client_name AS "clientName",
+          s.pickup_location AS "pickupLocation",
+          s.dropoff_location AS "dropoffLocation",
+          s.shipment_date AS "shipmentDate",
+          s.truck_type AS "truckType",
+          s.status,
+          s.negotiated_price_bdt AS "negotiatedPrice",
+          s.commission_amount_bdt AS "commissionAmount",
+          s.assigned_truck_id AS "assignedTruckId",
+          s.client_user_id AS "clientUserId",
+          t.truck_number AS "assignedTruckCode"
+        FROM shipments s
+        LEFT JOIN trucks t ON s.assigned_truck_id = t.id
+        ORDER BY s.shipment_date DESC, s.id DESC;
+      `;
+    } else {
+      query = `
+        SELECT 
+          s.id,
+          s.client_name AS "clientName",
+          s.pickup_location AS "pickupLocation",
+          s.dropoff_location AS "dropoffLocation",
+          s.shipment_date AS "shipmentDate",
+          s.truck_type AS "truckType",
+          s.status,
+          s.negotiated_price_bdt AS "negotiatedPrice",
+          s.commission_amount_bdt AS "commissionAmount",
+          s.assigned_truck_id AS "assignedTruckId",
+          s.client_user_id AS "clientUserId",
+          t.truck_number AS "assignedTruckCode"
+        FROM shipments s
+        LEFT JOIN trucks t ON s.assigned_truck_id = t.id
+        WHERE s.client_user_id = $1
+        ORDER BY s.shipment_date DESC, s.id DESC;
+      `;
+      values = [req.user.id];
+    }
+
+    const result = await pool.query(query, values);
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching shipments:", error.message);
@@ -69,9 +97,10 @@ const createShipment = async (req, res) => {
         truck_type,
         status,
         negotiated_price_bdt,
-        commission_amount_bdt
+        commission_amount_bdt,
+        client_user_id
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING
         id,
         client_name AS "clientName",
@@ -82,7 +111,8 @@ const createShipment = async (req, res) => {
         status,
         negotiated_price_bdt AS "negotiatedPrice",
         commission_amount_bdt AS "commissionAmount",
-        assigned_truck_id AS "assignedTruckId";
+        assigned_truck_id AS "assignedTruckId",
+        client_user_id AS "clientUserId";
       `,
       [
         clientName,
@@ -93,6 +123,7 @@ const createShipment = async (req, res) => {
         status,
         negotiatedPrice,
         commissionAmount,
+        req.user.id,
       ]
     );
 
@@ -159,7 +190,8 @@ const updateShipmentStatus = async (req, res) => {
         status,
         negotiated_price_bdt AS "negotiatedPrice",
         commission_amount_bdt AS "commissionAmount",
-        assigned_truck_id AS "assignedTruckId";
+        assigned_truck_id AS "assignedTruckId",
+        client_user_id AS "clientUserId";
       `,
       [status, id]
     );
@@ -276,6 +308,7 @@ const assignTruckToShipment = async (req, res) => {
         s.negotiated_price_bdt AS "negotiatedPrice",
         s.commission_amount_bdt AS "commissionAmount",
         s.assigned_truck_id AS "assignedTruckId",
+        s.client_user_id AS "clientUserId",
         t.truck_number AS "assignedTruckCode"
       FROM shipments s
       LEFT JOIN trucks t ON s.assigned_truck_id = t.id
