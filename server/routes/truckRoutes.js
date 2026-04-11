@@ -5,9 +5,10 @@ const {
   createTruck,
   updateTruckAvailability,
 } = require("../controllers/truckController");
+const { protect, adminOnly } = require("../middleware/authMiddleware");
 
-router.get("/", getAllTrucks);
-router.post("/", createTruck);
-router.patch("/:id/availability", updateTruckAvailability);
+router.get("/", protect, adminOnly, getAllTrucks);
+router.post("/", protect, adminOnly, createTruck);
+router.patch("/:id/availability", protect, adminOnly, updateTruckAvailability);
 
 module.exports = router;

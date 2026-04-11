@@ -7,7 +7,6 @@ export default function Login() {
     email: "",
     password: "",
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,6 +14,7 @@ export default function Login() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -33,7 +33,7 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(response.data.user));
 
       if (response.data.user.role === "admin") {
-        navigate("/");
+        navigate("/dashboard");
       } else {
         navigate("/shipments");
       }
@@ -45,9 +45,9 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100">
-      <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-        <h1 className="text-2xl font-bold text-center mb-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-100 px-6">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <h1 className="mb-6 text-center text-2xl font-bold text-slate-900">
           FreightFlow Login
         </h1>
 
@@ -58,7 +58,7 @@ export default function Login() {
             placeholder="Email"
             value={formData.email}
             onChange={handleChange}
-            className="border px-4 py-3 rounded-xl"
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
           />
 
           <input
@@ -67,15 +67,15 @@ export default function Login() {
             placeholder="Password"
             value={formData.password}
             onChange={handleChange}
-            className="border px-4 py-3 rounded-xl"
+            className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
           />
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700"
+            className="rounded-xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {loading ? "Logging in..." : "Login"}
           </button>
