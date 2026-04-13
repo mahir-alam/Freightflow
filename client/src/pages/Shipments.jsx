@@ -3,7 +3,6 @@ import Header from "../components/Header";
 import api from "../services/api";
 import useDisplayCurrency from "../hooks/useDisplayCurrency";
 
-
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
 const smallSelectClass =
@@ -573,7 +572,7 @@ function ShipmentCard({
 export default function Shipments() {
   const storedUser = localStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = ["admin", "demo_admin"].includes(user?.role);
 
   const [shipments, setShipments] = useState([]);
   const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});

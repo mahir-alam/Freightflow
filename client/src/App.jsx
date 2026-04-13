@@ -29,7 +29,7 @@ export default function App() {
         path="/"
         element={
           token && user ? (
-            user.role === "admin" ? (
+            ["admin", "demo_admin"].includes(user.role) ? (
               <Navigate to="/dashboard" replace />
             ) : (
               <Navigate to="/shipments" replace />

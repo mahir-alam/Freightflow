@@ -19,13 +19,13 @@ const protect = (req, res, next) => {
   }
 };
 
-const adminOnly = (req, res, next) => {
+const adminLikeOnly = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({ error: "Not authorized" });
   }
 
-  if (req.user.role !== "admin") {
-    return res.status(403).json({ error: "Admin access only" });
+  if (!["admin", "demo_admin"].includes(req.user.role)) {
+    return res.status(403).json({ error: "Admin-style access only" });
   }
 
   next();
@@ -33,5 +33,5 @@ const adminOnly = (req, res, next) => {
 
 module.exports = {
   protect,
-  adminOnly,
+  adminLikeOnly,
 };

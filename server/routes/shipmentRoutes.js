@@ -13,18 +13,18 @@ const {
   deleteShipment,
 } = require("../controllers/shipmentController");
 
-const { protect, adminOnly } = require("../middleware/authMiddleware");
+const { protect, adminLikeOnly } = require("../middleware/authMiddleware");
 
 router.get("/", protect, getAllShipments);
 router.post("/", protect, createShipment);
 
-router.get("/route-pricing-insights", protect, adminOnly, getRoutePricingInsights);
+router.get("/route-pricing-insights", protect, adminLikeOnly, getRoutePricingInsights);
 
-router.put("/:id", protect, adminOnly, updateShipment);
-router.get("/:id/recommend-trucks", protect, adminOnly, getRecommendedTrucksForShipment);
-router.patch("/:id/status", protect, adminOnly, updateShipmentStatus);
-router.patch("/:id/assign-truck", protect, adminOnly, assignTruckToShipment);
-router.patch("/:id/unassign-truck", protect, adminOnly, unassignTruckFromShipment);
-router.delete("/:id", protect, adminOnly, deleteShipment);
+router.put("/:id", protect, adminLikeOnly, updateShipment);
+router.get("/:id/recommend-trucks", protect, adminLikeOnly, getRecommendedTrucksForShipment);
+router.patch("/:id/status", protect, adminLikeOnly, updateShipmentStatus);
+router.patch("/:id/assign-truck", protect, adminLikeOnly, assignTruckToShipment);
+router.patch("/:id/unassign-truck", protect, adminLikeOnly, unassignTruckFromShipment);
+router.delete("/:id", protect, adminLikeOnly, deleteShipment);
 
 module.exports = router;

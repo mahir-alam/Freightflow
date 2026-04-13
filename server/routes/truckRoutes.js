@@ -9,12 +9,12 @@ const {
   deleteTruck,
 } = require("../controllers/truckController");
 
-const { protect, adminOnly } = require("../middleware/authMiddleware");
+const { protect, adminLikeOnly } = require("../middleware/authMiddleware");
 
-router.get("/", protect, adminOnly, getAllTrucks);
-router.post("/", protect, adminOnly, createTruck);
-router.put("/:id", protect, adminOnly, updateTruck);
-router.patch("/:id/availability", protect, adminOnly, updateTruckAvailability);
-router.delete("/:id", protect, adminOnly, deleteTruck);
+router.get("/", protect, adminLikeOnly, getAllTrucks);
+router.post("/", protect, adminLikeOnly, createTruck);
+router.put("/:id", protect, adminLikeOnly, updateTruck);
+router.patch("/:id/availability", protect, adminLikeOnly, updateTruckAvailability);
+router.delete("/:id", protect, adminLikeOnly, deleteTruck);
 
 module.exports = router;

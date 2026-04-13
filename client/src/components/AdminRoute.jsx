@@ -20,7 +20,7 @@ export default function AdminRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.role !== "admin") {
+  if (!["admin", "demo_admin"].includes(user.role)) {
     return <Navigate to="/shipments" replace />;
   }
 

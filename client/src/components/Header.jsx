@@ -6,7 +6,7 @@ export default function Header() {
 
   const storedUser = localStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
-  const isAdmin = user?.role === "admin";
+  const isAdminLike = ["admin", "demo_admin"].includes(user?.role);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -60,7 +60,7 @@ export default function Header() {
 
         {user && (
           <div className="flex items-center gap-2 border-t border-slate-200 py-3">
-            {isAdmin && (
+            {isAdminLike && (
               <Link to="/dashboard" className={navLinkClass("/dashboard")}>
                 Dashboard
               </Link>
@@ -70,7 +70,7 @@ export default function Header() {
               Shipments
             </Link>
 
-            {isAdmin && (
+            {isAdminLike && (
               <>
                 <Link to="/trucks" className={navLinkClass("/trucks")}>
                   Trucks
