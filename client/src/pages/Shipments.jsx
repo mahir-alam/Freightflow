@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
 
@@ -22,6 +22,12 @@ const initialFormData = {
   truckType: "",
   negotiatedPrice: "",
   commissionAmount: "",
+};
+
+const initialFilters = {
+  search: "",
+  status: "All",
+  assignment: "All",
 };
 
 const getNextStatusOptions = (currentStatus) => {
@@ -70,6 +76,7 @@ export default function Shipments() {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [formData, setFormData] = useState(initialFormData);
+  const [filters, setFilters] = useState(initialFilters);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
@@ -149,6 +156,24 @@ export default function Shipments() {
     loadPageData();
   }, []);
 
+  const filteredShipments = useMemo(() => {
+    return shipments.filter((shipment) => {
+      const matchesSearch = shipment.clientName
+        .toLowerCase()
+        .includes(filters.search.toLowerCase());
+
+      const matchesStatus =
+        filters.status === "All" || shipment.status === filters.status;
+
+      const matchesAssignment =
+        filters.assignment === "All" ||
+        (filters.assignment === "Assigned" && shipment.assignedTruckCode) ||
+        (filters.assignment === "Unassigned" && !shipment.assignedTruckCode);
+
+      return matchesSearch && matchesStatus && matchesAssignment;
+    });
+  }, [shipments, filters]);
+
   const formatCurrency = (amountInBdt) => {
     const convertedAmount = Number(amountInBdt) * currencyRates[currency];
 
@@ -196,6 +221,19 @@ export default function Shipments() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+
+    setFilters((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters(initialFilters);
   };
 
   const handleSubmit = async (e) => {
@@ -414,17 +452,102 @@ export default function Shipments() {
           </form>
         </section>
 
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Search & Filters</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Narrow down shipments by client, workflow status, or assignment state.
+              </p>
+            </div>
+
+            <div className="text-sm text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-800">
+                {filteredShipments.length}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-800">
+                {shipments.length}
+              </span>{" "}
+              shipments
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600">
+                Search by Client
+              </label>
+              <input
+                type="text"
+                name="search"
+                placeholder="Search client name"
+                value={filters.search}
+                onChange={handleFilterChange}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600">
+                Status
+              </label>
+              <select
+                name="status"
+                value={filters.status}
+                onChange={handleFilterChange}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="All">All statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Assigned">Assigned</option>
+                <option value="In Transit">In Transit</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-slate-600">
+                Assignment
+              </label>
+              <select
+                name="assignment"
+                value={filters.assignment}
+                onChange={handleFilterChange}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+              >
+                <option value="All">All shipments</option>
+                <option value="Assigned">Assigned only</option>
+                <option value="Unassigned">Unassigned only</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        </section>
+
         {loading ? (
           <p className="text-slate-600">Loading shipments...</p>
-        ) : shipments.length === 0 ? (
+        ) : filteredShipments.length === 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <h3 className="text-lg font-semibold text-slate-900">
-              No shipments found
+              {shipments.length === 0 ? "No shipments found" : "No matching shipments"}
             </h3>
             <p className="mt-2 text-sm text-slate-500">
-              {isAdmin
-                ? "No shipment requests have been created yet."
-                : "You have not created any shipment requests yet."}
+              {shipments.length === 0
+                ? isAdmin
+                  ? "No shipment requests have been created yet."
+                  : "You have not created any shipment requests yet."
+                : "Try adjusting your search or filter settings to see more results."}
             </p>
           </div>
         ) : (
@@ -446,7 +569,7 @@ export default function Shipments() {
               </thead>
 
               <tbody>
-                {shipments.map((shipment) => {
+                {filteredShipments.map((shipment) => {
                   const recommendedTrucks =
                     recommendedTrucksByShipment[shipment.id] || [];
 
