@@ -7,18 +7,29 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
+function getSafeUser() {
+  try {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch (error) {
+    console.error("Invalid user data in localStorage:", error);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    return null;
+  }
+}
+
 export default function App() {
   const token = localStorage.getItem("token");
-  const storedUser = localStorage.getItem("user");
-  const user = storedUser ? JSON.parse(storedUser) : null;
+  const user = getSafeUser();
 
   return (
     <Routes>
       <Route
         path="/"
         element={
-          token ? (
-            user?.role === "admin" ? (
+          token && user ? (
+            user.role === "admin" ? (
               <Navigate to="/dashboard" replace />
             ) : (
               <Navigate to="/shipments" replace />
@@ -66,6 +77,8 @@ export default function App() {
           </AdminRoute>
         }
       />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

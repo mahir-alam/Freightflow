@@ -1,14 +1,24 @@
 import { Navigate } from "react-router-dom";
 
+function getSafeUser() {
+  try {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  } catch (error) {
+    console.error("Invalid user data in localStorage:", error);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    return null;
+  }
+}
+
 export default function AdminRoute({ children }) {
   const token = localStorage.getItem("token");
-  const storedUser = localStorage.getItem("user");
+  const user = getSafeUser();
 
-  if (!token || !storedUser) {
+  if (!token || !user) {
     return <Navigate to="/login" replace />;
   }
-
-  const user = JSON.parse(storedUser);
 
   if (user.role !== "admin") {
     return <Navigate to="/shipments" replace />;
