@@ -57,16 +57,7 @@ const Badge = ({ text, colorClass }) => (
   </span>
 );
 
-const TruckModal = ({
-  isOpen,
-  mode,
-  formData,
-  onChange,
-  onClose,
-  onSubmit,
-  submitting,
-  error,
-}) => {
+const ModalShell = ({ isOpen, title, subtitle, onClose, children }) => {
   if (!isOpen) return null;
 
   return (
@@ -74,14 +65,8 @@ const TruckModal = ({
       <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-xl font-semibold">
-              {mode === "edit" ? "Edit Truck" : "Add Truck"}
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {mode === "edit"
-                ? "Update truck details and operational availability."
-                : "Register an external truck for brokerage assignment and tracking."}
-            </p>
+            <h3 className="text-xl font-semibold">{title}</h3>
+            {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           </div>
 
           <button
@@ -92,60 +77,117 @@ const TruckModal = ({
             Close
           </button>
         </div>
-
-        <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <input className={inputClass} name="truckCode" placeholder="Truck identifier (e.g., TRK-1001)" value={formData.truckCode} onChange={onChange} />
-          <input className={inputClass} name="driverName" placeholder="Driver name" value={formData.driverName} onChange={onChange} />
-          <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
-          <input className={inputClass} name="currentLocation" placeholder="Current location" value={formData.currentLocation} onChange={onChange} />
-
-          <select className={inputClass} name="availabilityStatus" value={formData.availabilityStatus} onChange={onChange}>
-            {availabilityOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
-            ))}
-          </select>
-
-          <input className={inputClass} type="number" step="0.01" name="capacityTons" placeholder="Capacity (tons)" value={formData.capacityTons} onChange={onChange} />
-
-          <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-3 md:flex-row md:items-center md:justify-between">
-            <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
-              {error || "Keep truck identifiers unique so every external vehicle can be tracked clearly."}
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Add Truck"}
-              </button>
-            </div>
-          </div>
-        </form>
+        {children}
       </div>
     </div>
   );
 };
 
+const TruckFormModal = ({
+  isOpen,
+  mode,
+  formData,
+  onChange,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}) => (
+  <ModalShell
+    isOpen={isOpen}
+    title={mode === "edit" ? "Edit Truck" : "Add Truck"}
+    subtitle={
+      mode === "edit"
+        ? "Update truck details and operational availability."
+        : "Register an external truck for brokerage assignment and tracking."
+    }
+    onClose={onClose}
+  >
+    <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <input className={inputClass} name="truckCode" placeholder="Truck identifier (e.g., TRK-1001)" value={formData.truckCode} onChange={onChange} />
+      <input className={inputClass} name="driverName" placeholder="Driver name" value={formData.driverName} onChange={onChange} />
+      <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
+      <input className={inputClass} name="currentLocation" placeholder="Current location" value={formData.currentLocation} onChange={onChange} />
+
+      <select className={inputClass} name="availabilityStatus" value={formData.availabilityStatus} onChange={onChange}>
+        {availabilityOptions.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+
+      <input className={inputClass} type="number" step="0.01" name="capacityTons" placeholder="Capacity (tons)" value={formData.capacityTons} onChange={onChange} />
+
+      <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-3 md:flex-row md:items-center md:justify-between">
+        <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
+          {error || "Keep truck identifiers unique so every external vehicle can be tracked clearly."}
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Add Truck"}
+          </button>
+        </div>
+      </div>
+    </form>
+  </ModalShell>
+);
+
+const ConfirmModal = ({
+  isOpen,
+  title,
+  message,
+  confirmText,
+  loading,
+  onClose,
+  onConfirm,
+}) => (
+  <ModalShell isOpen={isOpen} title={title} subtitle={message} onClose={onClose}>
+    <div className="flex justify-end gap-3">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onConfirm}
+        disabled={loading}
+        className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {loading ? "Processing..." : confirmText}
+      </button>
+    </div>
+  </ModalShell>
+);
+
 export default function Trucks() {
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(initialFilters);
+
   const [truckForm, setTruckForm] = useState(initialFormData);
   const [modalMode, setModalMode] = useState("create");
   const [editingTruckId, setEditingTruckId] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [updatingTruckId, setUpdatingTruckId] = useState(null);
+
+  const [deletingTruck, setDeletingTruck] = useState(null);
   const [deletingTruckId, setDeletingTruckId] = useState(null);
 
   const fetchTrucks = async () => {
@@ -187,7 +229,7 @@ export default function Trucks() {
     setEditingTruckId(null);
     setTruckForm(initialFormData);
     setFormError("");
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
   const openEditModal = (truck) => {
@@ -202,11 +244,11 @@ export default function Trucks() {
       capacityTons: truck.capacityTons,
     });
     setFormError("");
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  const closeFormModal = () => {
+    setIsFormModalOpen(false);
     setTruckForm(initialFormData);
     setEditingTruckId(null);
     setFormError("");
@@ -245,7 +287,7 @@ export default function Trucks() {
         await api.post("/api/trucks", payload);
       }
 
-      closeModal();
+      closeFormModal();
       await fetchTrucks();
     } catch (error) {
       console.error("Error saving truck:", error);
@@ -267,12 +309,13 @@ export default function Trucks() {
     }
   };
 
-  const handleDeleteTruck = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this truck?")) return;
+  const confirmDeleteTruck = async () => {
+    if (!deletingTruck) return;
 
     try {
-      setDeletingTruckId(id);
-      await api.delete(`/api/trucks/${id}`);
+      setDeletingTruckId(deletingTruck.id);
+      await api.delete(`/api/trucks/${deletingTruck.id}`);
+      setDeletingTruck(null);
       await fetchTrucks();
     } catch (error) {
       alert(error.response?.data?.error || "Failed to delete truck");
@@ -418,7 +461,7 @@ export default function Trucks() {
                           Edit
                         </button>
                         <button
-                          onClick={() => handleDeleteTruck(truck.id)}
+                          onClick={() => setDeletingTruck(truck)}
                           disabled={deletingTruckId === truck.id}
                           className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
                         >
@@ -433,15 +476,29 @@ export default function Trucks() {
           </div>
         )}
 
-        <TruckModal
-          isOpen={isModalOpen}
+        <TruckFormModal
+          isOpen={isFormModalOpen}
           mode={modalMode}
           formData={truckForm}
           onChange={handleTruckFormChange}
-          onClose={closeModal}
+          onClose={closeFormModal}
           onSubmit={handleTruckSubmit}
           submitting={submitting}
           error={formError}
+        />
+
+        <ConfirmModal
+          isOpen={Boolean(deletingTruck)}
+          title="Delete Truck"
+          message={
+            deletingTruck
+              ? `Delete truck ${deletingTruck.truckCode}? This cannot be undone.`
+              : ""
+          }
+          confirmText="Delete Truck"
+          loading={Boolean(deletingTruck && deletingTruckId === deletingTruck.id)}
+          onClose={() => setDeletingTruck(null)}
+          onConfirm={confirmDeleteTruck}
         />
       </main>
     </div>

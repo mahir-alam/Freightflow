@@ -7,6 +7,7 @@ const {
   updateShipment,
   updateShipmentStatus,
   assignTruckToShipment,
+  unassignTruckFromShipment,
   getRecommendedTrucksForShipment,
   deleteShipment,
 } = require("../controllers/shipmentController");
@@ -19,6 +20,7 @@ router.put("/:id", protect, adminOnly, updateShipment);
 router.get("/:id/recommend-trucks", protect, adminOnly, getRecommendedTrucksForShipment);
 router.patch("/:id/status", protect, adminOnly, updateShipmentStatus);
 router.patch("/:id/assign-truck", protect, adminOnly, assignTruckToShipment);
+router.patch("/:id/unassign-truck", protect, adminOnly, unassignTruckFromShipment);
 router.delete("/:id", protect, adminOnly, deleteShipment);
 
 module.exports = router;

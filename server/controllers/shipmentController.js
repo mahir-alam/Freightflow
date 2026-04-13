@@ -15,6 +15,20 @@ const shipmentSelectFields = `
   t.truck_number AS "assignedTruckCode"
 `;
 
+const baseShipmentReturnFields = `
+  id,
+  client_name AS "clientName",
+  pickup_location AS "pickupLocation",
+  dropoff_location AS "dropoffLocation",
+  shipment_date AS "shipmentDate",
+  truck_type AS "truckType",
+  status,
+  negotiated_price_bdt AS "negotiatedPrice",
+  commission_amount_bdt AS "commissionAmount",
+  assigned_truck_id AS "assignedTruckId",
+  client_user_id AS "clientUserId"
+`;
+
 const getAllShipments = async (req, res) => {
   try {
     let query = "";
@@ -103,18 +117,7 @@ const createShipment = async (req, res) => {
         client_user_id
       )
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING
-        id,
-        client_name AS "clientName",
-        pickup_location AS "pickupLocation",
-        dropoff_location AS "dropoffLocation",
-        shipment_date AS "shipmentDate",
-        truck_type AS "truckType",
-        status,
-        negotiated_price_bdt AS "negotiatedPrice",
-        commission_amount_bdt AS "commissionAmount",
-        assigned_truck_id AS "assignedTruckId",
-        client_user_id AS "clientUserId";
+      RETURNING ${baseShipmentReturnFields};
       `,
       [
         clientName,
@@ -167,7 +170,7 @@ const updateShipment = async (req, res) => {
 
     const existingShipment = await pool.query(
       `
-      SELECT id
+      SELECT id, status
       FROM shipments
       WHERE id = $1
       `,
@@ -190,18 +193,7 @@ const updateShipment = async (req, res) => {
         negotiated_price_bdt = $6,
         commission_amount_bdt = $7
       WHERE id = $8
-      RETURNING
-        id,
-        client_name AS "clientName",
-        pickup_location AS "pickupLocation",
-        dropoff_location AS "dropoffLocation",
-        shipment_date AS "shipmentDate",
-        truck_type AS "truckType",
-        status,
-        negotiated_price_bdt AS "negotiatedPrice",
-        commission_amount_bdt AS "commissionAmount",
-        assigned_truck_id AS "assignedTruckId",
-        client_user_id AS "clientUserId";
+      RETURNING ${baseShipmentReturnFields};
       `,
       [
         clientName,
@@ -268,18 +260,7 @@ const updateShipmentStatus = async (req, res) => {
       UPDATE shipments
       SET status = $1
       WHERE id = $2
-      RETURNING
-        id,
-        client_name AS "clientName",
-        pickup_location AS "pickupLocation",
-        dropoff_location AS "dropoffLocation",
-        shipment_date AS "shipmentDate",
-        truck_type AS "truckType",
-        status,
-        negotiated_price_bdt AS "negotiatedPrice",
-        commission_amount_bdt AS "commissionAmount",
-        assigned_truck_id AS "assignedTruckId",
-        client_user_id AS "clientUserId";
+      RETURNING ${baseShipmentReturnFields};
       `,
       [status, id]
     );
@@ -331,18 +312,22 @@ const assignTruckToShipment = async (req, res) => {
 
     const shipment = shipmentResult.rows[0];
 
-    if (shipment.status !== "Pending") {
+    if (!["Pending", "Assigned"].includes(shipment.status)) {
       await client.query("ROLLBACK");
       return res.status(400).json({
-        error: "Only pending shipments can be assigned a truck",
+        error: "Only pending or assigned shipments can be assigned or reassigned",
       });
     }
 
     if (shipment.assigned_truck_id) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: "Shipment already has an assigned truck",
-      });
+      await client.query(
+        `
+        UPDATE trucks
+        SET availability_status = 'Available'
+        WHERE id = $1
+        `,
+        [shipment.assigned_truck_id]
+      );
     }
 
     const truckResult = await client.query(
@@ -404,13 +389,89 @@ const assignTruckToShipment = async (req, res) => {
   }
 };
 
+const unassignTruckFromShipment = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { id } = req.params;
+
+    await client.query("BEGIN");
+
+    const shipmentResult = await client.query(
+      `
+      SELECT id, status, assigned_truck_id
+      FROM shipments
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    if (shipmentResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ error: "Shipment not found" });
+    }
+
+    const shipment = shipmentResult.rows[0];
+
+    if (!shipment.assigned_truck_id) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({ error: "Shipment does not have an assigned truck" });
+    }
+
+    if (shipment.status !== "Assigned") {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Only assigned shipments can have their truck unassigned",
+      });
+    }
+
+    await client.query(
+      `
+      UPDATE trucks
+      SET availability_status = 'Available'
+      WHERE id = $1
+      `,
+      [shipment.assigned_truck_id]
+    );
+
+    await client.query(
+      `
+      UPDATE shipments
+      SET assigned_truck_id = NULL,
+          status = 'Pending'
+      WHERE id = $1
+      `,
+      [id]
+    );
+
+    const updatedShipment = await client.query(
+      `
+      SELECT ${shipmentSelectFields}
+      FROM shipments s
+      LEFT JOIN trucks t ON s.assigned_truck_id = t.id
+      WHERE s.id = $1
+      `,
+      [id]
+    );
+
+    await client.query("COMMIT");
+    res.json(updatedShipment.rows[0]);
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error unassigning truck:", error.message);
+    res.status(500).json({ error: "Failed to unassign truck from shipment" });
+  } finally {
+    client.release();
+  }
+};
+
 const getRecommendedTrucksForShipment = async (req, res) => {
   try {
     const { id } = req.params;
 
     const shipmentResult = await pool.query(
       `
-      SELECT id, truck_type, pickup_location, status, assigned_truck_id
+      SELECT id, truck_type, pickup_location, status
       FROM shipments
       WHERE id = $1
       `,
@@ -423,15 +484,9 @@ const getRecommendedTrucksForShipment = async (req, res) => {
 
     const shipment = shipmentResult.rows[0];
 
-    if (shipment.status !== "Pending") {
+    if (!["Pending", "Assigned"].includes(shipment.status)) {
       return res.status(400).json({
-        error: "Recommendations are only available for pending shipments",
-      });
-    }
-
-    if (shipment.assigned_truck_id) {
-      return res.status(400).json({
-        error: "Shipment already has an assigned truck",
+        error: "Recommendations are only available for pending or assigned shipments",
       });
     }
 
@@ -525,6 +580,7 @@ module.exports = {
   updateShipment,
   updateShipmentStatus,
   assignTruckToShipment,
+  unassignTruckFromShipment,
   getRecommendedTrucksForShipment,
   deleteShipment,
 };

@@ -87,16 +87,7 @@ const Badge = ({ text, colorClass }) => (
   </span>
 );
 
-const ShipmentModal = ({
-  isOpen,
-  mode,
-  formData,
-  onChange,
-  onClose,
-  onSubmit,
-  submitting,
-  error,
-}) => {
+const ModalShell = ({ isOpen, title, subtitle, onClose, children }) => {
   if (!isOpen) return null;
 
   return (
@@ -104,14 +95,8 @@ const ShipmentModal = ({
       <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
-            <h3 className="text-xl font-semibold">
-              {mode === "edit" ? "Edit Shipment" : "Create Shipment"}
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              {mode === "edit"
-                ? "Update shipment details while keeping workflow controls separate."
-                : "Submit a new shipment request. New shipments start as Pending."}
-            </p>
+            <h3 className="text-xl font-semibold">{title}</h3>
+            {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
           </div>
 
           <button
@@ -122,50 +107,105 @@ const ShipmentModal = ({
             Close
           </button>
         </div>
-
-        <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <input className={inputClass} name="clientName" placeholder="Client name" value={formData.clientName} onChange={onChange} />
-          <input className={inputClass} name="pickupLocation" placeholder="Pickup location" value={formData.pickupLocation} onChange={onChange} />
-          <input className={inputClass} name="dropoffLocation" placeholder="Dropoff location" value={formData.dropoffLocation} onChange={onChange} />
-          <input className={inputClass} type="date" name="shipmentDate" value={formData.shipmentDate} onChange={onChange} />
-          <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
-          <input className={inputClass} type="number" name="negotiatedPrice" placeholder="Negotiated price (BDT)" value={formData.negotiatedPrice} onChange={onChange} />
-          <input className={inputClass} type="number" name="commissionAmount" placeholder="Commission amount (BDT)" value={formData.commissionAmount} onChange={onChange} />
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Initial Status
-            </p>
-            <p className="mt-1 text-sm font-semibold text-amber-700">Pending</p>
-          </div>
-
-          <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
-            <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
-              {error || "Prices are stored in BDT and shown in your selected currency."}
-            </p>
-
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Shipment"}
-              </button>
-            </div>
-          </div>
-        </form>
+        {children}
       </div>
     </div>
   );
 };
+
+const ShipmentFormModal = ({
+  isOpen,
+  mode,
+  formData,
+  onChange,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}) => (
+  <ModalShell
+    isOpen={isOpen}
+    title={mode === "edit" ? "Edit Shipment" : "Create Shipment"}
+    subtitle={
+      mode === "edit"
+        ? "Update shipment details without changing workflow permissions."
+        : "Create a new shipment request. New shipments start as Pending."
+    }
+    onClose={onClose}
+  >
+    <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <input className={inputClass} name="clientName" placeholder="Client name" value={formData.clientName} onChange={onChange} />
+      <input className={inputClass} name="pickupLocation" placeholder="Pickup location" value={formData.pickupLocation} onChange={onChange} />
+      <input className={inputClass} name="dropoffLocation" placeholder="Dropoff location" value={formData.dropoffLocation} onChange={onChange} />
+      <input className={inputClass} type="date" name="shipmentDate" value={formData.shipmentDate} onChange={onChange} />
+      <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
+      <input className={inputClass} type="number" name="negotiatedPrice" placeholder="Negotiated price (BDT)" value={formData.negotiatedPrice} onChange={onChange} />
+      <input className={inputClass} type="number" name="commissionAmount" placeholder="Commission amount (BDT)" value={formData.commissionAmount} onChange={onChange} />
+
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Workflow Start
+        </p>
+        <p className="mt-1 text-sm font-semibold text-amber-700">
+          {mode === "edit" ? "Status managed separately" : "Pending"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
+        <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
+          {error || "Prices are stored in BDT and shown in your selected currency."}
+        </p>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Shipment"}
+          </button>
+        </div>
+      </div>
+    </form>
+  </ModalShell>
+);
+
+const ConfirmModal = ({
+  isOpen,
+  title,
+  message,
+  confirmText,
+  loading,
+  onClose,
+  onConfirm,
+}) => (
+  <ModalShell isOpen={isOpen} title={title} subtitle={message} onClose={onClose}>
+    <div className="flex justify-end gap-3">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        onClick={onConfirm}
+        disabled={loading}
+        className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {loading ? "Processing..." : confirmText}
+      </button>
+    </div>
+  </ModalShell>
+);
 
 export default function Shipments() {
   const storedUser = localStorage.getItem("user");
@@ -177,13 +217,19 @@ export default function Shipments() {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [filters, setFilters] = useState(initialFilters);
-  const [modalMode, setModalMode] = useState("create");
+
   const [shipmentForm, setShipmentForm] = useState(initialFormData);
+  const [modalMode, setModalMode] = useState("create");
   const [editingShipmentId, setEditingShipmentId] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
+
+  const [deletingShipment, setDeletingShipment] = useState(null);
+  const [unassigningShipment, setUnassigningShipment] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [unassigningId, setUnassigningId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [assigningTruckId, setAssigningTruckId] = useState(null);
 
@@ -196,9 +242,9 @@ export default function Shipments() {
   };
 
   const fetchShipments = async () => {
-    const res = await api.get("/api/shipments");
-    setShipments(res.data);
-    return res.data;
+    const response = await api.get("/api/shipments");
+    setShipments(response.data);
+    return response.data;
   };
 
   const fetchRecommendations = async (shipmentList) => {
@@ -207,15 +253,15 @@ export default function Shipments() {
       return;
     }
 
-    const pending = shipmentList.filter(
-      (shipment) => shipment.status === "Pending" && !shipment.assignedTruckCode
+    const eligible = shipmentList.filter((shipment) =>
+      shipment.status === "Pending" || shipment.status === "Assigned"
     );
 
     const results = await Promise.all(
-      pending.map(async (shipment) => {
+      eligible.map(async (shipment) => {
         try {
-          const res = await api.get(`/api/shipments/${shipment.id}/recommend-trucks`);
-          return [shipment.id, res.data];
+          const response = await api.get(`/api/shipments/${shipment.id}/recommend-trucks`);
+          return [shipment.id, response.data];
         } catch {
           return [shipment.id, []];
         }
@@ -260,7 +306,7 @@ export default function Shipments() {
     setEditingShipmentId(null);
     setShipmentForm(initialFormData);
     setFormError("");
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
   const openEditModal = (shipment) => {
@@ -276,14 +322,14 @@ export default function Shipments() {
       commissionAmount: shipment.commissionAmount,
     });
     setFormError("");
-    setIsModalOpen(true);
+    setIsFormModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setFormError("");
-    setEditingShipmentId(null);
+  const closeFormModal = () => {
+    setIsFormModalOpen(false);
     setShipmentForm(initialFormData);
+    setEditingShipmentId(null);
+    setFormError("");
   };
 
   const handleShipmentFormChange = (e) => {
@@ -321,7 +367,7 @@ export default function Shipments() {
         await api.post("/api/shipments", payload);
       }
 
-      closeModal();
+      closeFormModal();
       await loadPageData();
     } catch (error) {
       console.error("Error saving shipment:", error);
@@ -355,24 +401,39 @@ export default function Shipments() {
       });
       await loadPageData();
     } catch (error) {
-      alert(error.response?.data?.error || "Failed to assign truck");
+      alert(error.response?.data?.error || "Failed to assign or reassign truck");
     } finally {
       setAssigningTruckId(null);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!isAdmin) return;
-    if (!window.confirm("Are you sure you want to delete this shipment?")) return;
+  const confirmDeleteShipment = async () => {
+    if (!deletingShipment) return;
 
     try {
-      setDeletingId(id);
-      await api.delete(`/api/shipments/${id}`);
+      setDeletingId(deletingShipment.id);
+      await api.delete(`/api/shipments/${deletingShipment.id}`);
+      setDeletingShipment(null);
       await loadPageData();
     } catch (error) {
       alert(error.response?.data?.error || "Failed to delete shipment");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const confirmUnassignShipment = async () => {
+    if (!unassigningShipment) return;
+
+    try {
+      setUnassigningId(unassigningShipment.id);
+      await api.patch(`/api/shipments/${unassigningShipment.id}/unassign-truck`);
+      setUnassigningShipment(null);
+      await loadPageData();
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to unassign truck");
+    } finally {
+      setUnassigningId(null);
     }
   };
 
@@ -386,7 +447,7 @@ export default function Shipments() {
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="mt-2 text-slate-600">
               {isAdmin
-                ? "Manage shipment requests, assign trucks, update operations, and maintain workflow control."
+                ? "Manage shipment requests, truck assignments, reassignments, and workflow updates."
                 : "Create shipment requests and track the progress of your logistics workflow."}
             </p>
           </div>
@@ -504,6 +565,8 @@ export default function Shipments() {
               <tbody>
                 {filteredShipments.map((shipment) => {
                   const recommendedTrucks = recommendedTrucksByShipment[shipment.id] || [];
+                  const canShowRecommendations =
+                    shipment.status === "Pending" || shipment.status === "Assigned";
 
                   return (
                     <tr key={shipment.id} className="border-t border-slate-200 align-top">
@@ -536,7 +599,7 @@ export default function Shipments() {
 
                       {isAdmin && (
                         <td className="px-6 py-4">
-                          {shipment.status === "Pending" && !shipment.assignedTruckCode ? (
+                          {canShowRecommendations ? (
                             recommendedTrucks.length > 0 ? (
                               <div className="flex flex-col gap-2">
                                 {recommendedTrucks.slice(0, 3).map((truck) => {
@@ -602,15 +665,43 @@ export default function Shipments() {
 
                       {isAdmin && (
                         <td className="px-6 py-4">
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => openEditModal(shipment)}
                               className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
                             >
                               Edit
                             </button>
+
+                            {shipment.assignedTruckCode && shipment.status === "Assigned" && (
+                              <button
+                                onClick={() => setUnassigningShipment(shipment)}
+                                className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                              >
+                                Unassign
+                              </button>
+                            )}
+
+                            {canShowRecommendations && recommendedTrucks.length > 0 && (
+                              <select
+                                defaultValue=""
+                                onChange={(e) => handleAssignTruck(shipment.id, e.target.value)}
+                                disabled={assigningTruckId === shipment.id}
+                                className={smallSelectClass}
+                              >
+                                <option value="">
+                                  {shipment.assignedTruckCode ? "Reassign truck" : "Assign truck"}
+                                </option>
+                                {recommendedTrucks.map((truck) => (
+                                  <option key={truck.id} value={truck.id}>
+                                    {truck.truckCode}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+
                             <button
-                              onClick={() => handleDelete(shipment.id)}
+                              onClick={() => setDeletingShipment(shipment)}
                               disabled={deletingId === shipment.id}
                               className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
                             >
@@ -627,15 +718,43 @@ export default function Shipments() {
           </div>
         )}
 
-        <ShipmentModal
-          isOpen={isModalOpen}
+        <ShipmentFormModal
+          isOpen={isFormModalOpen}
           mode={modalMode}
           formData={shipmentForm}
           onChange={handleShipmentFormChange}
-          onClose={closeModal}
+          onClose={closeFormModal}
           onSubmit={handleShipmentSubmit}
           submitting={submitting}
           error={formError}
+        />
+
+        <ConfirmModal
+          isOpen={Boolean(deletingShipment)}
+          title="Delete Shipment"
+          message={
+            deletingShipment
+              ? `Delete shipment for ${deletingShipment.clientName}? This action cannot be undone.`
+              : ""
+          }
+          confirmText="Delete Shipment"
+          loading={Boolean(deletingShipment && deletingId === deletingShipment.id)}
+          onClose={() => setDeletingShipment(null)}
+          onConfirm={confirmDeleteShipment}
+        />
+
+        <ConfirmModal
+          isOpen={Boolean(unassigningShipment)}
+          title="Unassign Truck"
+          message={
+            unassigningShipment
+              ? `Unassign truck ${unassigningShipment.assignedTruckCode} from this shipment? The shipment will move back to Pending.`
+              : ""
+          }
+          confirmText="Unassign Truck"
+          loading={Boolean(unassigningShipment && unassigningId === unassigningShipment.id)}
+          onClose={() => setUnassigningShipment(null)}
+          onConfirm={confirmUnassignShipment}
         />
       </main>
     </div>
