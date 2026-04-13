@@ -34,7 +34,9 @@ const getAllShipments = async (req, res) => {
     let query = "";
     let values = [];
 
-    if (req.user.role === "admin") {
+    const canSeeAllShipments = ["admin", "demo_admin"].includes(req.user.role);
+
+    if (canSeeAllShipments) {
       query = `
         SELECT ${shipmentSelectFields}
         FROM shipments s
@@ -101,7 +103,9 @@ const createShipment = async (req, res) => {
     const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
     let finalStatus = "Pending";
 
-    if (req.user.role === "admin" && status) {
+    const isAdminLike = ["admin", "demo_admin"].includes(req.user.role);
+
+    if (isAdminLike && status) {
       if (!allowedStatuses.includes(status)) {
         return res.status(400).json({ error: "Invalid shipment status" });
       }

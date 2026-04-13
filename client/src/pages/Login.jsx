@@ -14,6 +14,14 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  const hostname = window.location.hostname;
+  const isLocalEnvironment =
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname.startsWith("192.168.") ||
+    hostname.startsWith("10.") ||
+    hostname.endsWith(".local");
+
   const handleChange = (e) => {
     const { name, value } = e.target;
 
@@ -23,24 +31,24 @@ export default function Login() {
     }));
   };
 
-  const handleRolePrefill = (role) => {
-    if (role === "admin") {
-      setMode("login");
-      setFormData({
-        fullName: "",
-        email: "admin@freightflow.com",
-        password: "admin123",
-      });
-    } else if (role === "client") {
-      setMode("login");
-      setFormData({
-        fullName: "",
-        email: "client@freightflow.com",
-        password: "client123",
-      });
-    }
-
+  const handlePrefillAdmin = () => {
     setError("");
+    setMode("login");
+    setFormData({
+      fullName: "",
+      email: "admin@freightflow.com",
+      password: "admin123",
+    });
+  };
+
+  const handlePrefillClient = () => {
+    setError("");
+    setMode("login");
+    setFormData({
+      fullName: "",
+      email: "client@freightflow.com",
+      password: "client123",
+    });
   };
 
   const handleQuickDemoAccess = async () => {
@@ -148,35 +156,43 @@ export default function Login() {
           <p className="mt-2 text-slate-500">
             {mode === "signup"
               ? "New accounts are created with client access."
-              : "Role-based access for logistics brokerage operations."}
+              : "Use Quick Demo to explore the full product with demo data."}
           </p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <button
-              type="button"
-              onClick={() => handleRolePrefill("admin")}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Admin Access
-            </button>
+          {mode === "login" && (
+            <div className="mt-6 space-y-3">
+              <button
+                type="button"
+                onClick={handleQuickDemoAccess}
+                disabled={loading}
+                className="w-full rounded-xl border border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Quick Demo
+              </button>
 
-            <button
-              type="button"
-              onClick={() => handleRolePrefill("client")}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Client Access
-            </button>
+              {isLocalEnvironment && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={handlePrefillAdmin}
+                    disabled={loading}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    Admin Access
+                  </button>
 
-            <button
-              type="button"
-              onClick={handleQuickDemoAccess}
-              disabled={loading}
-              className="rounded-xl border border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              Quick Demo
-            </button>
-          </div>
+                  <button
+                    type="button"
+                    onClick={handlePrefillClient}
+                    disabled={loading}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    Client Access
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             {mode === "signup" && (
@@ -251,6 +267,11 @@ export default function Login() {
                   onClick={() => {
                     setMode("login");
                     setError("");
+                    setFormData({
+                      fullName: "",
+                      email: "",
+                      password: "",
+                    });
                   }}
                   className="font-semibold text-blue-600 hover:text-blue-700"
                 >
@@ -265,6 +286,11 @@ export default function Login() {
                   onClick={() => {
                     setMode("signup");
                     setError("");
+                    setFormData({
+                      fullName: "",
+                      email: "",
+                      password: "",
+                    });
                   }}
                   className="font-semibold text-blue-600 hover:text-blue-700"
                 >
