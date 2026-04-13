@@ -111,29 +111,29 @@ VITE_API_BASE_URL=http://localhost:5000
 ---
 
 ## 🧠 How It Works
-React Frontend → Express API → PostgreSQL + Python/Pandas Analytics
-Frontend sends shipment, truck, and analytics requests
-Backend handles authentication, business logic, and database operations
-PostgreSQL stores users, shipments, trucks, and workflow data
-Python + Pandas process shipment and truck data for route-level analytics
-Dashboard and analytics pages surface operational and profitability insights
+* React Frontend → Express API → PostgreSQL + Python/Pandas Analytics
+* Frontend sends shipment, truck, and analytics requests
+* Backend handles authentication, business logic, and database operations
+* PostgreSQL stores users, shipments, trucks, and workflow data
+* Python + Pandas process shipment and truck data for route-level analytics
+* Dashboard and analytics pages surface operational and profitability insights
 
 ---
 
 ## 📌 Notes
-First request may be slower on Render free tier
-Demo mode uses seeded synthetic logistics data
-Public demo includes a reset flow to restore original demo data
-Pandas analytics require requirements.txt dependencies during backend setup
+* First request may be slower on Render free tier
+* Demo mode uses seeded synthetic logistics data
+* Public demo includes a reset flow to restore original demo data
+* Pandas analytics require requirements.txt dependencies during backend setup
 
 ---
 
 ## 🔮 Future Improvements
-Toast notifications for major user actions
-Custom confirmation modals instead of browser confirm dialogs
-Exportable analytics and operational reports
-Activity log / audit trail for shipment actions
-Advanced client and company management workflows
+* Toast notifications for major user actions
+* Custom confirmation modals instead of browser confirm dialogs
+* Exportable analytics and operational reports
+* Activity log / audit trail for shipment actions
+* Advanced client and company management workflows
 
 ---
 
