@@ -39,47 +39,48 @@ Data-driven logistics brokerage platform for managing shipment operations, truck
 
 ### 🚀 Login & Demo Access
 <p align="center">
-  <img src="docs/screenshots/1_login.png" width="60%"/>
+  <img src="docs/screenshots/1.Login.png" width="70%"/>
 </p>
 
 ### 📊 Dashboard Overview
 <p align="center">
-  <img src="docs/screenshots/2_dashboard_top.png" width="80%"/>
+  <img src="docs/2.Dashboard.png" width="70%"/>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/3_dashboard_pandas.png" width="80%"/>
+  <img src="docs/3.Dashboard.png" width="70%"/>
 </p>
 
 ### 📦 Shipment Management
 <p align="center">
-  <img src="docs/screenshots/4_shipments.png" width="80%"/>
+  <img src="docs/4.Shipment.png" width="70%"/>
 </p>
 
 ### 🚛 Truck Operations
 <p align="center">
-  <img src="docs/screenshots/5_trucks.png" width="80%"/>
+  <img src="docs/5.Trucks.png" width="70%"/>
 </p>
 
 ### 📈 Analytics & Insights
 <p align="center">
-  <img src="docs/screenshots/6_analytics_top.png" width="80%"/>
+  <img src="docs/6.Analytics.png" width="70%"/>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/7_analytics_charts.png" width="80%"/>
+  <img src="docs/7.Analytics.png" width="70%"/>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/8_analytics_routes.png" width="80%"/>
+  <img src="docs/8.Analytics.png" width="70%"/>
 </p>
 
 ---
 
 ## ⚙️ Setup (Local)
 
+### Clone Repo
+
 ```bash
-# Clone repo
 git clone [paste your GitHub repo link here]
 cd Freightflow
 
@@ -88,12 +89,10 @@ cd server
 npm install
 pip install -r requirements.txt
 npm run dev
-
 Frontend
 cd client
 npm install
 npm run dev
-
 🔐 Environment Variables
 
 Create a .env file in server:
@@ -108,29 +107,37 @@ CLIENT_URL=http://localhost:5173
 
 Create a .env file in client:
 VITE_API_BASE_URL=http://localhost:5000
+```
+---
 
-🧠 How It Works
+## 🧠 How It Works
 React Frontend → Express API → PostgreSQL + Python/Pandas Analytics
 Frontend sends shipment, truck, and analytics requests
-Backend handles auth, business logic, and database operations
+Backend handles authentication, business logic, and database operations
 PostgreSQL stores users, shipments, trucks, and workflow data
 Python + Pandas process shipment and truck data for route-level analytics
-Dashboard and analytics pages display operational and profitability insights
+Dashboard and analytics pages surface operational and profitability insights
 
-📌 Notes
+---
+
+## 📌 Notes
 First request may be slower on Render free tier
 Demo mode uses seeded synthetic logistics data
 Public demo includes a reset flow to restore original demo data
 Pandas analytics require requirements.txt dependencies during backend setup
 
-🔮 Future Improvements
-Toast notifications for all major actions
+---
+
+## 🔮 Future Improvements
+Toast notifications for major user actions
 Custom confirmation modals instead of browser confirm dialogs
-Exportable analytics and reports
+Exportable analytics and operational reports
 Activity log / audit trail for shipment actions
-Advanced client and company management features
+Advanced client and company management workflows
 
-👨‍💻 Author
+---
 
+## 👨‍💻 Author
 Mahir Alam
 (University of Calgary)
+
