@@ -1,4 +1,43 @@
 const pool = require("../config/db");
+const path = require("path");
+const { spawn } = require("child_process");
+
+const runPythonAnalytics = (payload) => {
+  return new Promise((resolve, reject) => {
+    const scriptPath = path.join(__dirname, "..", "python", "advanced_analytics.py");
+
+    const pythonProcess = spawn("python", [scriptPath]);
+
+    let stdout = "";
+    let stderr = "";
+
+    pythonProcess.stdout.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    pythonProcess.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    pythonProcess.on("close", (code) => {
+      if (code !== 0) {
+        return reject(
+          new Error(stderr || `Python analytics process exited with code ${code}`)
+        );
+      }
+
+      try {
+        const parsed = JSON.parse(stdout);
+        resolve(parsed);
+      } catch (error) {
+        reject(new Error("Failed to parse Python analytics output"));
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify(payload));
+    pythonProcess.stdin.end();
+  });
+};
 
 const getAnalyticsData = async (req, res) => {
   try {
@@ -103,6 +142,36 @@ const getAnalyticsData = async (req, res) => {
       ORDER BY DATE_TRUNC('month', shipment_date) ASC;
     `);
 
+    const rawShipmentDataResult = await pool.query(`
+      SELECT
+        s.id,
+        s.client_name AS "clientName",
+        s.pickup_location AS "pickupLocation",
+        s.dropoff_location AS "dropoffLocation",
+        s.shipment_date AS "shipmentDate",
+        s.truck_type AS "truckType",
+        s.status,
+        s.negotiated_price_bdt AS "negotiatedPrice",
+        s.commission_amount_bdt AS "commissionAmount",
+        t.truck_number AS "assignedTruckCode"
+      FROM shipments s
+      LEFT JOIN trucks t ON s.assigned_truck_id = t.id
+      ORDER BY s.shipment_date ASC, s.id ASC;
+    `);
+
+    const rawTruckDataResult = await pool.query(`
+      SELECT
+        id,
+        truck_number AS "truckCode",
+        driver_name AS "driverName",
+        truck_type AS "truckType",
+        current_location AS "currentLocation",
+        availability_status AS "availabilityStatus",
+        capacity_tons AS "capacityTons"
+      FROM trucks
+      ORDER BY id ASC;
+    `);
+
     const revenueSummary = revenueResult.rows[0];
     const operationsSummary = operationsSummaryResult.rows[0];
     const fleetSummary = fleetSummaryResult.rows[0];
@@ -123,6 +192,28 @@ const getAnalyticsData = async (req, res) => {
     const truckUtilizationRate =
       totalTrucks > 0 ? (assignedTrucks / totalTrucks) * 100 : 0;
 
+    let pandasInsights = {
+      mostProfitableRoutes: [],
+      lowestMarginRoutes: [],
+      routeBenchmarks: [],
+      monthlyShipmentTrend: [],
+      truckTypeProfitability: [],
+      summary: {
+        averageMarginPercent: 0,
+        highestMarginPercent: 0,
+        lowestMarginPercent: 0,
+      },
+    };
+
+    try {
+      pandasInsights = await runPythonAnalytics({
+        shipments: rawShipmentDataResult.rows,
+        trucks: rawTruckDataResult.rows,
+      });
+    } catch (pythonError) {
+      console.error("Python analytics failed:", pythonError.message);
+    }
+
     res.json({
       shipmentStatusData: shipmentStatusResult.rows,
       truckAvailabilityData: truckAvailabilityResult.rows,
@@ -141,6 +232,7 @@ const getAnalyticsData = async (req, res) => {
       dropoffInsights: dropoffInsightsResult.rows,
       truckTypeInsights: truckTypeInsightsResult.rows,
       monthlyRevenueData: monthlyRevenueResult.rows,
+      pandasInsights,
     });
   } catch (error) {
     console.error("Error fetching analytics data:", error.message);

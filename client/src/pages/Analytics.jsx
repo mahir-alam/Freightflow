@@ -72,6 +72,20 @@ export default function Analytics() {
     dropoffInsights: [],
     truckTypeInsights: [],
     monthlyRevenueData: [],
+    pandasInsights: {
+      mostProfitableRoutes: [],
+      lowestMarginRoutes: [],
+      routeBenchmarks: [],
+      monthlyShipmentTrend: [],
+      truckTypeProfitability: [],
+      summary: {
+        averageMarginPercent: 0,
+        highestMarginPercent: 0,
+        lowestMarginPercent: 0,
+        truckCountAnalyzed: 0,
+        shipmentCountAnalyzed: 0,
+      },
+    },
   });
 
   const [currency, setCurrency] = useState("BDT");
@@ -112,6 +126,12 @@ export default function Analytics() {
     commissionDisplay: Number(item.commission) * currencyRates[currency],
   }));
 
+  const pandasMonthlyTrendData = analytics.pandasInsights.monthlyShipmentTrend.map((item) => ({
+    ...item,
+    averagePriceDisplay: Number(item.averagePrice) * currencyRates[currency],
+    totalCommissionDisplay: Number(item.totalCommission) * currencyRates[currency],
+  }));
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <Header />
@@ -122,7 +142,7 @@ export default function Analytics() {
             <h1 className="text-3xl font-bold">Analytics</h1>
             <p className="mt-2 text-slate-600">
               Monitor shipment performance, route demand, truck utilization,
-              revenue flow, and brokerage commission trends.
+              revenue flow, commission trends, and Pandas-powered business insights.
             </p>
           </div>
 
@@ -198,6 +218,34 @@ export default function Analytics() {
                 title="Truck Utilization"
                 value={formatPercent(analytics.fleetSummary.truckUtilizationRate)}
                 description="Share of fleet currently assigned"
+              />
+            </section>
+
+            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <StatCard
+                title="Pandas Avg Margin"
+                value={formatPercent(analytics.pandasInsights.summary.averageMarginPercent)}
+                description="Average margin computed from Python analytics"
+              />
+              <StatCard
+                title="Highest Margin"
+                value={formatPercent(analytics.pandasInsights.summary.highestMarginPercent)}
+                description="Best margin identified across shipments"
+              />
+              <StatCard
+                title="Lowest Margin"
+                value={formatPercent(analytics.pandasInsights.summary.lowestMarginPercent)}
+                description="Weakest margin identified across shipments"
+              />
+              <StatCard
+                title="Shipments Analyzed"
+                value={analytics.pandasInsights.summary.shipmentCountAnalyzed}
+                description="Records processed in Pandas layer"
+              />
+              <StatCard
+                title="Trucks Analyzed"
+                value={analytics.pandasInsights.summary.truckCountAnalyzed}
+                description="Fleet records included in analysis"
               />
             </section>
 
@@ -281,17 +329,17 @@ export default function Analytics() {
               </Card>
 
               <Card
-                title="Truck Type Demand"
-                subtitle="Shipment demand by required truck type"
+                title="Pandas Monthly Shipment Trend"
+                subtitle="Monthly demand and margin-related trend summary"
               >
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analytics.truckTypeInsights}>
+                    <BarChart data={pandasMonthlyTrendData}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="truckType" />
+                      <XAxis dataKey="shipmentMonth" />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
-                      <Bar dataKey="count" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="shipmentCount" name="Shipments" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -300,79 +348,145 @@ export default function Analytics() {
 
             <section className="mb-8 grid gap-6 xl:grid-cols-2">
               <Card
-                title="Top Pickup Locations"
-                subtitle="Highest shipment volume by pickup point"
+                title="Most Profitable Routes"
+                subtitle="Routes ranked by total commission and margin quality"
               >
-                <div className="space-y-3">
-                  {analytics.pickupInsights.length === 0 ? (
-                    <p className="text-sm text-slate-500">No pickup insight data available.</p>
-                  ) : (
-                    analytics.pickupInsights.map((item, index) => (
+                {analytics.pandasInsights.mostProfitableRoutes.length === 0 ? (
+                  <p className="text-sm text-slate-500">No Pandas route profitability data available.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {analytics.pandasInsights.mostProfitableRoutes.map((route, index) => (
                       <div
-                        key={`${item.name}-${index}`}
-                        className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
+                        key={`${route.route}-${index}`}
+                        className="rounded-xl bg-slate-50 p-4"
                       >
-                        <span className="font-medium text-slate-800">{item.name}</span>
-                        <span className="text-sm text-slate-500">{item.count} shipments</span>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{route.route}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {route.shipmentCount} shipments
+                            </p>
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            <div>
+                              Commission:{" "}
+                              <span className="font-semibold text-slate-900">
+                                {formatCurrency(route.totalCommission)}
+                              </span>
+                            </div>
+                            <div>
+                              Avg margin:{" "}
+                              <span className="font-semibold text-slate-900">
+                                {formatPercent(route.averageMarginPercent)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </Card>
 
               <Card
-                title="Top Dropoff Locations"
-                subtitle="Highest shipment volume by destination"
+                title="Lowest Margin Routes"
+                subtitle="Routes that may need pricing review or margin improvement"
               >
-                <div className="space-y-3">
-                  {analytics.dropoffInsights.length === 0 ? (
-                    <p className="text-sm text-slate-500">No dropoff insight data available.</p>
-                  ) : (
-                    analytics.dropoffInsights.map((item, index) => (
+                {analytics.pandasInsights.lowestMarginRoutes.length === 0 ? (
+                  <p className="text-sm text-slate-500">No low-margin route data available.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {analytics.pandasInsights.lowestMarginRoutes.map((route, index) => (
                       <div
-                        key={`${item.name}-${index}`}
-                        className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
+                        key={`${route.route}-${index}`}
+                        className="rounded-xl bg-slate-50 p-4"
                       >
-                        <span className="font-medium text-slate-800">{item.name}</span>
-                        <span className="text-sm text-slate-500">{item.count} shipments</span>
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{route.route}</p>
+                            <p className="mt-1 text-sm text-slate-500">
+                              {route.shipmentCount} shipments
+                            </p>
+                          </div>
+                          <div className="text-sm text-slate-600">
+                            <div>
+                              Avg price:{" "}
+                              <span className="font-semibold text-slate-900">
+                                {formatCurrency(route.averagePrice)}
+                              </span>
+                            </div>
+                            <div>
+                              Avg margin:{" "}
+                              <span className="font-semibold text-slate-900">
+                                {formatPercent(route.averageMarginPercent)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </Card>
             </section>
 
-            <section className="grid gap-6">
+            <section className="grid gap-6 xl:grid-cols-2">
               <Card
-                title="Top Route Insights"
-                subtitle="Highest volume routes with price and commission intelligence"
+                title="Route Benchmarks"
+                subtitle="Pandas-generated benchmark view by route volume and pricing"
               >
-                {analytics.routeInsights.length === 0 ? (
-                  <p className="text-sm text-slate-500">No route insight data available.</p>
+                {analytics.pandasInsights.routeBenchmarks.length === 0 ? (
+                  <p className="text-sm text-slate-500">No benchmark data available.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead className="border-b border-slate-200 text-left text-slate-500">
                         <tr>
-                          <th className="px-4 py-3">Pickup</th>
-                          <th className="px-4 py-3">Dropoff</th>
+                          <th className="px-4 py-3">Route</th>
+                          <th className="px-4 py-3">Shipments</th>
+                          <th className="px-4 py-3">Avg Price</th>
+                          <th className="px-4 py-3">Avg Margin</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.pandasInsights.routeBenchmarks.map((route, index) => (
+                          <tr key={index} className="border-b border-slate-100">
+                            <td className="px-4 py-3 font-medium">{route.route}</td>
+                            <td className="px-4 py-3">{route.shipmentCount}</td>
+                            <td className="px-4 py-3">{formatCurrency(route.averagePrice)}</td>
+                            <td className="px-4 py-3">{formatPercent(route.averageMarginPercent)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+
+              <Card
+                title="Truck Type Profitability"
+                subtitle="Profitability and demand by shipment truck type"
+              >
+                {analytics.pandasInsights.truckTypeProfitability.length === 0 ? (
+                  <p className="text-sm text-slate-500">No truck type profitability data available.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="border-b border-slate-200 text-left text-slate-500">
+                        <tr>
+                          <th className="px-4 py-3">Truck Type</th>
                           <th className="px-4 py-3">Shipments</th>
                           <th className="px-4 py-3">Avg Price</th>
                           <th className="px-4 py-3">Total Commission</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {analytics.routeInsights.map((route, index) => (
+                        {analytics.pandasInsights.truckTypeProfitability.map((item, index) => (
                           <tr key={index} className="border-b border-slate-100">
-                            <td className="px-4 py-3 font-medium">{route.pickupLocation}</td>
-                            <td className="px-4 py-3">{route.dropoffLocation}</td>
-                            <td className="px-4 py-3">{route.shipmentCount}</td>
-                            <td className="px-4 py-3">
-                              {formatCurrency(route.averagePrice)}
-                            </td>
-                            <td className="px-4 py-3">
-                              {formatCurrency(route.totalCommission)}
-                            </td>
+                            <td className="px-4 py-3 font-medium">{item.truckType}</td>
+                            <td className="px-4 py-3">{item.shipmentCount}</td>
+                            <td className="px-4 py-3">{formatCurrency(item.averagePrice)}</td>
+                            <td className="px-4 py-3">{formatCurrency(item.totalCommission)}</td>
                           </tr>
                         ))}
                       </tbody>
