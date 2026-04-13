@@ -17,7 +17,6 @@ import {
   CartesianGrid,
 } from "recharts";
 
-
 const pieColors = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
 const Card = ({ title, subtitle, children, className = "" }) => (
@@ -48,6 +47,73 @@ const CompactMetricCard = ({ title, value, description }) => (
     <h3 className="mt-2 text-2xl font-bold text-slate-900">{value}</h3>
     <p className="mt-2 text-xs text-slate-500">{description}</p>
   </div>
+);
+
+const SkeletonMetricCard = ({ compact = false }) => (
+  <div
+    className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${
+      compact ? "p-4" : "p-5"
+    }`}
+  >
+    <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+    <div
+      className={`mt-4 animate-pulse rounded bg-slate-200 ${
+        compact ? "h-8 w-20" : "h-10 w-24"
+      }`}
+    />
+    <div className="mt-4 h-3 w-36 animate-pulse rounded bg-slate-200" />
+  </div>
+);
+
+const SkeletonChartCard = ({ title, subtitle }) => (
+  <Card title={title} subtitle={subtitle}>
+    <div className="h-80 rounded-xl bg-slate-50 p-4">
+      <div className="h-full w-full animate-pulse rounded-lg bg-slate-200" />
+    </div>
+  </Card>
+);
+
+const SkeletonListCard = ({ title, subtitle, rows = 3 }) => (
+  <Card title={title} subtitle={subtitle}>
+    <div className="space-y-3">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} className="rounded-xl bg-slate-50 p-4">
+          <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-3 w-24 animate-pulse rounded bg-slate-200" />
+          <div className="mt-3 h-3 w-32 animate-pulse rounded bg-slate-200" />
+        </div>
+      ))}
+    </div>
+  </Card>
+);
+
+const SkeletonTableCard = ({ title, subtitle, columns = 4, rows = 4 }) => (
+  <Card title={title} subtitle={subtitle}>
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-sm">
+        <thead className="border-b border-slate-200 text-left text-slate-500">
+          <tr>
+            {Array.from({ length: columns }).map((_, index) => (
+              <th key={index} className="px-4 py-3">
+                <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: rows }).map((_, rowIndex) => (
+            <tr key={rowIndex} className="border-b border-slate-100">
+              {Array.from({ length: columns }).map((_, colIndex) => (
+                <td key={colIndex} className="px-4 py-3">
+                  <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </Card>
 );
 
 export default function Analytics() {
@@ -169,11 +235,16 @@ export default function Analytics() {
           </div>
         </div>
 
-        {loading ? (
-          <p className="text-slate-600">Loading analytics...</p>
-        ) : (
-          <>
-            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {loading ? (
+            <>
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+            </>
+          ) : (
+            <>
               <MetricCard
                 title="Total Revenue"
                 value={formatCurrency(analytics.revenueSummary.totalRevenue)}
@@ -194,9 +265,20 @@ export default function Analytics() {
                 value={formatPercent(analytics.revenueSummary.averageCommissionRate)}
                 description="Average commission as % of shipment value"
               />
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {loading ? (
+            <>
+              <SkeletonMetricCard compact />
+              <SkeletonMetricCard compact />
+              <SkeletonMetricCard compact />
+              <SkeletonMetricCard compact />
+            </>
+          ) : (
+            <>
               <CompactMetricCard
                 title="Total Shipments"
                 value={analytics.operationsSummary.totalShipments}
@@ -217,9 +299,24 @@ export default function Analytics() {
                 value={formatPercent(analytics.pandasInsights.summary.averageMarginPercent)}
                 description="Average margin from analytics layer"
               />
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="mb-8 grid gap-6 xl:grid-cols-2">
+        <section className="mb-8 grid gap-6 xl:grid-cols-2">
+          {loading ? (
+            <>
+              <SkeletonChartCard
+                title="Shipment Status Breakdown"
+                subtitle="Distribution of shipment workflow stages"
+              />
+              <SkeletonChartCard
+                title="Truck Availability Breakdown"
+                subtitle="Current operational availability across external trucks"
+              />
+            </>
+          ) : (
+            <>
               <Card
                 title="Shipment Status Breakdown"
                 subtitle="Distribution of shipment workflow stages"
@@ -265,9 +362,24 @@ export default function Analytics() {
                   </ResponsiveContainer>
                 </div>
               </Card>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="mb-8 grid gap-6 xl:grid-cols-2">
+        <section className="mb-8 grid gap-6 xl:grid-cols-2">
+          {loading ? (
+            <>
+              <SkeletonChartCard
+                title="Revenue Trend"
+                subtitle="Revenue and commission across shipment months"
+              />
+              <SkeletonChartCard
+                title="Pandas Monthly Shipment Trend"
+                subtitle="Monthly demand and margin-related trend summary"
+              />
+            </>
+          ) : (
+            <>
               <Card
                 title="Revenue Trend"
                 subtitle="Revenue and commission across shipment months"
@@ -330,9 +442,24 @@ export default function Analytics() {
                   )}
                 </div>
               </Card>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="mb-8 grid gap-6 xl:grid-cols-2">
+        <section className="mb-8 grid gap-6 xl:grid-cols-2">
+          {loading ? (
+            <>
+              <SkeletonListCard
+                title="Most Profitable Routes"
+                subtitle="Routes ranked by total commission and margin quality"
+              />
+              <SkeletonListCard
+                title="Lowest Margin Routes"
+                subtitle="Routes that may need pricing review or margin improvement"
+              />
+            </>
+          ) : (
+            <>
               <Card
                 title="Most Profitable Routes"
                 subtitle="Routes ranked by total commission and margin quality"
@@ -418,9 +545,24 @@ export default function Analytics() {
                   </div>
                 )}
               </Card>
-            </section>
+            </>
+          )}
+        </section>
 
-            <section className="grid gap-6 xl:grid-cols-2">
+        <section className="grid gap-6 xl:grid-cols-2">
+          {loading ? (
+            <>
+              <SkeletonTableCard
+                title="Route Benchmarks"
+                subtitle="Pandas-generated benchmark view by route volume and pricing"
+              />
+              <SkeletonTableCard
+                title="Truck Type Profitability"
+                subtitle="Profitability and demand by shipment truck type"
+              />
+            </>
+          ) : (
+            <>
               <Card
                 title="Route Benchmarks"
                 subtitle="Pandas-generated benchmark view by route volume and pricing"
@@ -494,9 +636,9 @@ export default function Analytics() {
                   </div>
                 )}
               </Card>
-            </section>
-          </>
-        )}
+            </>
+          )}
+        </section>
       </main>
     </div>
   );
