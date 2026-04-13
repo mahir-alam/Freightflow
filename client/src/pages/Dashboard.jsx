@@ -224,26 +224,26 @@ export default function Dashboard() {
                 title="Quick Actions"
                 subtitle="Jump straight into operational workflows"
               >
-                <div className="grid gap-3">
-                  <Link
-                    to="/shipments"
-                    className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
-                  >
-                    Manage Shipments
-                  </Link>
-                  <Link
-                    to="/trucks"
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    Manage Trucks
-                  </Link>
-                  <Link
-                    to="/analytics"
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    View Full Analytics
-                  </Link>
-                </div>
+            <div className="grid gap-3">
+              <Link
+                to="/shipments"
+                className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-200 hover:bg-slate-100"
+              >
+                Manage Shipments
+              </Link>
+              <Link
+                to="/trucks"
+                className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-200 hover:bg-slate-100"
+              >
+                Manage Trucks
+              </Link>
+              <Link
+                to="/analytics"
+                className="rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition duration-200 hover:bg-slate-100"
+              >
+                View Full Analytics
+              </Link>
+            </div>
               </Card>
 
               <Card
