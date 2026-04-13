@@ -16,7 +16,9 @@ const currencySymbols = {
 };
 
 const Card = ({ title, subtitle, right, children, className = "" }) => (
-  <section className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
+  <section
+    className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}
+  >
     {(title || subtitle || right) && (
       <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
@@ -50,8 +52,31 @@ const StatusBadge = ({ text, variant = "default" }) => {
   };
 
   return (
-    <span className={`rounded-full px-3 py-1 text-xs font-medium ${styles[variant] || styles.default}`}>
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-medium ${
+        styles[variant] || styles.default
+      }`}
+    >
       {text}
+    </span>
+  );
+};
+
+const InsightPill = ({ label, tone = "neutral" }) => {
+  const tones = {
+    good: "bg-emerald-50 text-emerald-700",
+    warning: "bg-amber-50 text-amber-700",
+    danger: "bg-red-50 text-red-700",
+    neutral: "bg-slate-100 text-slate-700",
+  };
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+        tones[tone] || tones.neutral
+      }`}
+    >
+      {label}
     </span>
   );
 };
@@ -97,17 +122,19 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
-  const recentShipments = useMemo(() => {
-    return [...shipments].slice(0, 5);
-  }, [shipments]);
+  const recentShipments = useMemo(() => [...shipments].slice(0, 5), [shipments]);
 
   const recentAvailableTrucks = useMemo(() => {
-    return trucks.filter((truck) => truck.availabilityStatus === "Available").slice(0, 5);
+    return trucks
+      .filter((truck) => truck.availabilityStatus === "Available")
+      .slice(0, 5);
   }, [trucks]);
 
   const dashboardStats = useMemo(() => {
     const totalShipments = shipments.length;
-    const pendingShipments = shipments.filter((shipment) => shipment.status === "Pending").length;
+    const pendingShipments = shipments.filter(
+      (shipment) => shipment.status === "Pending"
+    ).length;
     const inTransitShipments = shipments.filter(
       (shipment) => shipment.status === "In Transit"
     ).length;
@@ -129,6 +156,25 @@ export default function Dashboard() {
     };
   }, [shipments]);
 
+  const topProfitableRoute = analytics?.pandasInsights?.mostProfitableRoutes?.[0];
+  const weakestRoute = analytics?.pandasInsights?.lowestMarginRoutes?.[0];
+
+  const marginSummary = analytics?.pandasInsights?.summary || {
+    averageMarginPercent: 0,
+    highestMarginPercent: 0,
+    lowestMarginPercent: 0,
+  };
+
+  const lowMarginCount =
+    analytics?.pandasInsights?.lowestMarginRoutes?.filter(
+      (route) => Number(route.averageMarginPercent) < Number(marginSummary.averageMarginPercent || 0)
+    ).length || 0;
+
+  const healthyMarginCount =
+    analytics?.pandasInsights?.mostProfitableRoutes?.filter(
+      (route) => Number(route.averageMarginPercent) >= Number(marginSummary.averageMarginPercent || 0)
+    ).length || 0;
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <Header />
@@ -138,7 +184,8 @@ export default function Dashboard() {
           <div>
             <h1 className="text-3xl font-bold">Operations Dashboard</h1>
             <p className="mt-2 text-slate-600">
-              Monitor brokerage activity, shipment workflow, truck readiness, and business performance in one place.
+              Monitor brokerage activity, shipment workflow, truck readiness,
+              pricing intelligence, and business performance in one place.
             </p>
           </div>
 
@@ -228,27 +275,171 @@ export default function Dashboard() {
               >
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">Completion Rate</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Completion Rate
+                    </p>
                     <p className="mt-2 text-2xl font-bold">
-                      {analytics ? `${Number(analytics.operationsSummary.completionRate).toFixed(1)}%` : "0.0%"}
+                      {analytics
+                        ? `${Number(
+                            analytics.operationsSummary.completionRate
+                          ).toFixed(1)}%`
+                        : "0.0%"}
                     </p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">Assignment Rate</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Assignment Rate
+                    </p>
                     <p className="mt-2 text-2xl font-bold">
-                      {analytics ? `${Number(analytics.operationsSummary.assignmentRate).toFixed(1)}%` : "0.0%"}
+                      {analytics
+                        ? `${Number(
+                            analytics.operationsSummary.assignmentRate
+                          ).toFixed(1)}%`
+                        : "0.0%"}
                     </p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">Truck Utilization</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Truck Utilization
+                    </p>
                     <p className="mt-2 text-2xl font-bold">
-                      {analytics ? `${Number(analytics.fleetSummary.truckUtilizationRate).toFixed(1)}%` : "0.0%"}
+                      {analytics
+                        ? `${Number(
+                            analytics.fleetSummary.truckUtilizationRate
+                          ).toFixed(1)}%`
+                        : "0.0%"}
                     </p>
                   </div>
                   <div className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-500">Avg Commission Rate</p>
+                    <p className="text-sm font-medium text-slate-500">
+                      Avg Margin
+                    </p>
                     <p className="mt-2 text-2xl font-bold">
-                      {analytics ? `${Number(analytics.revenueSummary.averageCommissionRate).toFixed(1)}%` : "0.0%"}
+                      {analytics
+                        ? `${Number(
+                            analytics.pandasInsights.summary.averageMarginPercent
+                          ).toFixed(1)}%`
+                        : "0.0%"}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </section>
+
+            <section className="mb-8 grid gap-6 xl:grid-cols-2">
+              <Card
+                title="Pandas Spotlight"
+                subtitle="Top and bottom route signals from profitability analysis"
+              >
+                <div className="grid gap-4">
+                  <div className="rounded-xl bg-emerald-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-emerald-700">
+                        Top Profitable Route
+                      </p>
+                      <InsightPill label="High Margin" tone="good" />
+                    </div>
+
+                    {topProfitableRoute ? (
+                      <>
+                        <p className="mt-2 text-lg font-semibold text-slate-900">
+                          {topProfitableRoute.route}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Commission{" "}
+                          {formatCurrency(topProfitableRoute.totalCommission)} • Avg
+                          margin{" "}
+                          {Number(
+                            topProfitableRoute.averageMarginPercent
+                          ).toFixed(1)}
+                          %
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-600">
+                        No profitable route insight yet.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl bg-amber-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-amber-700">
+                        Route Requiring Review
+                      </p>
+                      <InsightPill label="Margin Watch" tone="warning" />
+                    </div>
+
+                    {weakestRoute ? (
+                      <>
+                        <p className="mt-2 text-lg font-semibold text-slate-900">
+                          {weakestRoute.route}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Avg price {formatCurrency(weakestRoute.averagePrice)} • Avg
+                          margin{" "}
+                          {Number(weakestRoute.averageMarginPercent).toFixed(1)}%
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-600">
+                        No weak route insight yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                title="Margin Watch"
+                subtitle="Operational pricing signals surfaced from the analytics layer"
+              >
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-500">
+                      Healthy Margin Routes
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                      {healthyMarginCount}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Top routes performing at or above average margin
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-500">
+                      Low Margin Routes
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                      {lowMarginCount}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Routes that may need pricing review before booking
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-500">
+                      Highest Margin Seen
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                      {Number(marginSummary.highestMarginPercent || 0).toFixed(1)}%
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Strongest observed commission efficiency in the dataset
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-500">
+                      Lowest Margin Seen
+                    </p>
+                    <p className="mt-2 text-2xl font-bold text-slate-900">
+                      {Number(marginSummary.lowestMarginPercent || 0).toFixed(1)}%
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Weakest observed margin that may indicate underpricing
                     </p>
                   </div>
                 </div>
@@ -261,7 +452,9 @@ export default function Dashboard() {
                 subtitle="Latest shipment activity across the platform"
               >
                 {recentShipments.length === 0 ? (
-                  <p className="text-sm text-slate-500">No shipments available yet.</p>
+                  <p className="text-sm text-slate-500">
+                    No shipments available yet.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {recentShipments.map((shipment) => (
@@ -270,7 +463,9 @@ export default function Dashboard() {
                         className="flex flex-col gap-3 rounded-xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between"
                       >
                         <div>
-                          <p className="font-semibold text-slate-900">{shipment.clientName}</p>
+                          <p className="font-semibold text-slate-900">
+                            {shipment.clientName}
+                          </p>
                           <p className="mt-1 text-sm text-slate-500">
                             {shipment.pickupLocation} → {shipment.dropoffLocation}
                           </p>
@@ -280,7 +475,10 @@ export default function Dashboard() {
                         </div>
 
                         <div className="flex flex-col items-start gap-2 md:items-end">
-                          <StatusBadge text={shipment.status} variant={shipment.status} />
+                          <StatusBadge
+                            text={shipment.status}
+                            variant={shipment.status}
+                          />
                           <p className="text-sm font-semibold text-slate-800">
                             {formatCurrency(shipment.negotiatedPrice)}
                           </p>
@@ -296,7 +494,9 @@ export default function Dashboard() {
                 subtitle="Quick view of trucks currently ready for assignment"
               >
                 {recentAvailableTrucks.length === 0 ? (
-                  <p className="text-sm text-slate-500">No available trucks right now.</p>
+                  <p className="text-sm text-slate-500">
+                    No available trucks right now.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {recentAvailableTrucks.map((truck) => (
@@ -305,7 +505,9 @@ export default function Dashboard() {
                         className="flex flex-col gap-3 rounded-xl bg-slate-50 p-4 md:flex-row md:items-center md:justify-between"
                       >
                         <div>
-                          <p className="font-semibold text-slate-900">{truck.truckCode}</p>
+                          <p className="font-semibold text-slate-900">
+                            {truck.truckCode}
+                          </p>
                           <p className="mt-1 text-sm text-slate-500">
                             {truck.driverName} • {truck.truckType}
                           </p>
@@ -320,76 +522,6 @@ export default function Dashboard() {
                         />
                       </div>
                     ))}
-                  </div>
-                )}
-              </Card>
-            </section>
-
-            <section className="grid gap-6 xl:grid-cols-2">
-              <Card
-                title="Top Routes"
-                subtitle="Highest shipment routes by activity"
-              >
-                {!analytics || analytics.routeInsights.length === 0 ? (
-                  <p className="text-sm text-slate-500">No route insights available yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {analytics.routeInsights.slice(0, 5).map((route, index) => (
-                      <div
-                        key={`${route.pickupLocation}-${route.dropoffLocation}-${index}`}
-                        className="rounded-xl bg-slate-50 p-4"
-                      >
-                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            <p className="font-semibold text-slate-900">
-                              {route.pickupLocation} → {route.dropoffLocation}
-                            </p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              {route.shipmentCount} shipments
-                            </p>
-                          </div>
-
-                          <div className="text-sm text-slate-600">
-                            Avg price:{" "}
-                            <span className="font-semibold text-slate-900">
-                              {formatCurrency(route.averagePrice)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-
-              <Card
-                title="Business Snapshot"
-                subtitle="High-value summary for demo and recruiter view"
-              >
-                {!analytics ? (
-                  <p className="text-sm text-slate-500">No analytics summary available yet.</p>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-slate-500">Average Shipment Value</p>
-                      <p className="mt-2 text-2xl font-bold text-slate-900">
-                        {formatCurrency(analytics.revenueSummary.averageShipmentValue)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-slate-500">Average Commission</p>
-                      <p className="mt-2 text-2xl font-bold text-slate-900">
-                        {formatCurrency(analytics.revenueSummary.averageCommission)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl bg-slate-50 p-4">
-                      <p className="text-sm font-medium text-slate-500">Available Trucks</p>
-                      <p className="mt-2 text-2xl font-bold text-slate-900">
-                        {analytics.fleetSummary.availableTrucks}
-                      </p>
-                    </div>
                   </div>
                 )}
               </Card>

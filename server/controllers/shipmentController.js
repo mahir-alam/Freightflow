@@ -89,8 +89,13 @@ const createShipment = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (Number.isNaN(Number(negotiatedPrice)) || Number.isNaN(Number(commissionAmount))) {
-      return res.status(400).json({ error: "Price and commission must be valid numbers" });
+    if (
+      Number.isNaN(Number(negotiatedPrice)) ||
+      Number.isNaN(Number(commissionAmount))
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Price and commission must be valid numbers" });
     }
 
     const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
@@ -170,7 +175,7 @@ const updateShipment = async (req, res) => {
 
     const existingShipment = await pool.query(
       `
-      SELECT id, status
+      SELECT id
       FROM shipments
       WHERE id = $1
       `,
@@ -415,7 +420,9 @@ const unassignTruckFromShipment = async (req, res) => {
 
     if (!shipment.assigned_truck_id) {
       await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Shipment does not have an assigned truck" });
+      return res
+        .status(400)
+        .json({ error: "Shipment does not have an assigned truck" });
     }
 
     if (shipment.status !== "Assigned") {
@@ -520,6 +527,99 @@ const getRecommendedTrucksForShipment = async (req, res) => {
   }
 };
 
+const getRoutePricingInsights = async (req, res) => {
+  try {
+    const { pickupLocation, dropoffLocation, truckType } = req.query;
+
+    if (!pickupLocation || !dropoffLocation) {
+      return res.status(400).json({
+        error: "Pickup location and dropoff location are required",
+      });
+    }
+
+    const exactMatchResult = await pool.query(
+      `
+      SELECT
+        COUNT(*)::int AS "shipmentCount",
+        COALESCE(AVG(negotiated_price_bdt), 0)::float AS "averagePrice",
+        COALESCE(AVG(commission_amount_bdt), 0)::float AS "averageCommission",
+        COALESCE(
+          AVG(
+            CASE
+              WHEN negotiated_price_bdt > 0
+              THEN (commission_amount_bdt / negotiated_price_bdt) * 100
+              ELSE 0
+            END
+          ),
+          0
+        )::float AS "averageMarginPercent",
+        COALESCE(MIN(negotiated_price_bdt), 0)::float AS "minObservedPrice",
+        COALESCE(MAX(negotiated_price_bdt), 0)::float AS "maxObservedPrice"
+      FROM shipments
+      WHERE pickup_location = $1
+        AND dropoff_location = $2
+        AND ($3::text IS NULL OR truck_type = $3)
+      `,
+      [pickupLocation, dropoffLocation, truckType || null]
+    );
+
+    const routeOnlyResult = await pool.query(
+      `
+      SELECT
+        COUNT(*)::int AS "shipmentCount",
+        COALESCE(AVG(negotiated_price_bdt), 0)::float AS "averagePrice",
+        COALESCE(AVG(commission_amount_bdt), 0)::float AS "averageCommission",
+        COALESCE(
+          AVG(
+            CASE
+              WHEN negotiated_price_bdt > 0
+              THEN (commission_amount_bdt / negotiated_price_bdt) * 100
+              ELSE 0
+            END
+          ),
+          0
+        )::float AS "averageMarginPercent"
+      FROM shipments
+      WHERE pickup_location = $1
+        AND dropoff_location = $2
+      `,
+      [pickupLocation, dropoffLocation]
+    );
+
+    const exact = exactMatchResult.rows[0];
+    const routeOnly = routeOnlyResult.rows[0];
+
+    const hasExactMatch = Number(exact.shipmentCount) > 0;
+    const selectedBenchmark = hasExactMatch ? exact : routeOnly;
+    const selectedShipmentCount = Number(selectedBenchmark.shipmentCount || 0);
+    const averagePrice = Number(selectedBenchmark.averagePrice || 0);
+    const averageCommission = Number(selectedBenchmark.averageCommission || 0);
+    const averageMarginPercent = Number(
+      selectedBenchmark.averageMarginPercent || 0
+    );
+
+    const suggestedMinPrice = averagePrice > 0 ? averagePrice * 0.9 : 0;
+    const suggestedMaxPrice = averagePrice > 0 ? averagePrice * 1.1 : 0;
+
+    res.json({
+      benchmarkType: hasExactMatch ? "exact_route_and_truck_type" : "route_only",
+      shipmentCount: selectedShipmentCount,
+      routeShipmentCount: Number(routeOnly.shipmentCount || 0),
+      averagePrice,
+      averageCommission,
+      averageMarginPercent,
+      minObservedPrice: Number(exact.minObservedPrice || 0),
+      maxObservedPrice: Number(exact.maxObservedPrice || 0),
+      suggestedMinPrice,
+      suggestedMaxPrice,
+      hasEnoughData: selectedShipmentCount >= 2,
+    });
+  } catch (error) {
+    console.error("Error fetching route pricing insights:", error.message);
+    res.status(500).json({ error: "Failed to fetch route pricing insights" });
+  }
+};
+
 const deleteShipment = async (req, res) => {
   const client = await pool.connect();
 
@@ -582,5 +682,6 @@ module.exports = {
   assignTruckToShipment,
   unassignTruckFromShipment,
   getRecommendedTrucksForShipment,
+  getRoutePricingInsights,
   deleteShipment,
 };

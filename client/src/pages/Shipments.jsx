@@ -59,6 +59,14 @@ const getRecommendationLabel = (truck, shipment) => {
   return "Available fallback";
 };
 
+const getPricePosition = (price, min, max) => {
+  const numericPrice = Number(price || 0);
+  if (!numericPrice || !min || !max) return null;
+  if (numericPrice < min) return "below";
+  if (numericPrice > max) return "above";
+  return "within";
+};
+
 const Card = ({ title, subtitle, right, children, className = "" }) => (
   <section className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
     {(title || subtitle || right) && (
@@ -91,8 +99,8 @@ const ModalShell = ({ isOpen, title, subtitle, onClose, children }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4 py-6">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-start justify-between">
           <div>
             <h3 className="text-xl font-semibold">{title}</h3>
@@ -113,6 +121,167 @@ const ModalShell = ({ isOpen, title, subtitle, onClose, children }) => {
   );
 };
 
+function RoutePricingInsights({ isAdmin, formData, currency, formatCurrency }) {
+  const [insights, setInsights] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (
+      !isAdmin ||
+      !formData.pickupLocation.trim() ||
+      !formData.dropoffLocation.trim()
+    ) {
+      setInsights(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const response = await api.get("/api/shipments/route-pricing-insights", {
+          params: {
+            pickupLocation: formData.pickupLocation.trim(),
+            dropoffLocation: formData.dropoffLocation.trim(),
+            truckType: formData.truckType.trim() || undefined,
+          },
+        });
+        setInsights(response.data);
+      } catch (error) {
+        console.error("Error loading route pricing insights:", error);
+        setInsights(null);
+      } finally {
+        setLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timeoutId);
+  }, [isAdmin, formData.pickupLocation, formData.dropoffLocation, formData.truckType]);
+
+  if (!isAdmin) return null;
+
+  const pricePosition = insights
+    ? getPricePosition(
+        formData.negotiatedPrice,
+        insights.suggestedMinPrice,
+        insights.suggestedMaxPrice
+      )
+    : null;
+
+  const positionText = {
+    below: "Below suggested range",
+    within: "Within suggested range",
+    above: "Above suggested range",
+  };
+
+  const positionColor = {
+    below: "bg-red-50 text-red-700",
+    within: "bg-emerald-50 text-emerald-700",
+    above: "bg-amber-50 text-amber-700",
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 md:col-span-2 xl:col-span-4">
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h4 className="text-base font-semibold text-slate-900">Route Pricing Insights</h4>
+          <p className="mt-1 text-sm text-slate-500">
+            Benchmark this shipment against similar historic routes before saving.
+          </p>
+        </div>
+        {loading && <span className="text-sm text-slate-500">Loading insights...</span>}
+      </div>
+
+      {!formData.pickupLocation.trim() || !formData.dropoffLocation.trim() ? (
+        <p className="text-sm text-slate-500">
+          Enter pickup and dropoff locations to load pricing intelligence.
+        </p>
+      ) : !insights ? (
+        <p className="text-sm text-slate-500">
+          No benchmark data available yet for this route.
+        </p>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Benchmark Type</p>
+            <p className="mt-2 text-base font-semibold text-slate-900">
+              {insights.benchmarkType === "exact_route_and_truck_type"
+                ? "Exact route + truck type"
+                : "Route-level fallback"}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Comparable Shipments</p>
+            <p className="mt-2 text-2xl font-bold text-slate-900">{insights.shipmentCount}</p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Historic Avg Price</p>
+            <p className="mt-2 text-base font-semibold text-slate-900">
+              {formatCurrency(insights.averagePrice)}
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Historic Avg Margin</p>
+            <p className="mt-2 text-base font-semibold text-slate-900">
+              {Number(insights.averageMarginPercent).toFixed(1)}%
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-sm md:col-span-2">
+            <p className="text-sm font-medium text-slate-500">Suggested Price Band</p>
+            <p className="mt-2 text-base font-semibold text-slate-900">
+              {formatCurrency(insights.suggestedMinPrice)} — {formatCurrency(insights.suggestedMaxPrice)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Based on historic averages with a ±10% guidance range
+            </p>
+          </div>
+
+          <div className="rounded-xl bg-white p-4 shadow-sm md:col-span-2">
+            <p className="text-sm font-medium text-slate-500">Commission Benchmark</p>
+            <p className="mt-2 text-base font-semibold text-slate-900">
+              Avg commission {formatCurrency(insights.averageCommission)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Use this to sanity-check your expected brokerage return
+            </p>
+          </div>
+
+          {pricePosition && (
+            <div className="md:col-span-2 xl:col-span-4">
+              <span
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${positionColor[pricePosition]}`}
+              >
+                {positionText[pricePosition]}
+              </span>
+            </div>
+          )}
+
+          {formData.negotiatedPrice &&
+            formData.commissionAmount &&
+            Number(formData.negotiatedPrice) > 0 && (
+              <div className="rounded-xl bg-white p-4 shadow-sm md:col-span-2 xl:col-span-4">
+                <p className="text-sm font-medium text-slate-500">Current Entered Margin</p>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {(
+                    (Number(formData.commissionAmount) / Number(formData.negotiatedPrice)) *
+                    100
+                  ).toFixed(1)}
+                  %
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Compare this against the historic route margin before finalizing pricing
+                </p>
+              </div>
+            )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const ShipmentFormModal = ({
   isOpen,
   mode,
@@ -122,13 +291,16 @@ const ShipmentFormModal = ({
   onSubmit,
   submitting,
   error,
+  isAdmin,
+  currency,
+  formatCurrency,
 }) => (
   <ModalShell
     isOpen={isOpen}
     title={mode === "edit" ? "Edit Shipment" : "Create Shipment"}
     subtitle={
       mode === "edit"
-        ? "Update shipment details without changing workflow permissions."
+        ? "Update shipment details and use route benchmarks to validate pricing."
         : "Create a new shipment request. New shipments start as Pending."
     }
     onClose={onClose}
@@ -150,6 +322,13 @@ const ShipmentFormModal = ({
           {mode === "edit" ? "Status managed separately" : "Pending"}
         </p>
       </div>
+
+      <RoutePricingInsights
+        isAdmin={isAdmin}
+        formData={formData}
+        currency={currency}
+        formatCurrency={formatCurrency}
+      />
 
       <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
         <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
@@ -234,7 +413,7 @@ export default function Shipments() {
   const [assigningTruckId, setAssigningTruckId] = useState(null);
 
   const formatCurrency = (amount) => {
-    const converted = Number(amount) * currencyRates[currency];
+    const converted = Number(amount || 0) * currencyRates[currency];
     return `${currencySymbols[currency]}${converted.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
@@ -253,8 +432,8 @@ export default function Shipments() {
       return;
     }
 
-    const eligible = shipmentList.filter((shipment) =>
-      shipment.status === "Pending" || shipment.status === "Assigned"
+    const eligible = shipmentList.filter(
+      (shipment) => shipment.status === "Pending" || shipment.status === "Assigned"
     );
 
     const results = await Promise.all(
@@ -290,8 +469,7 @@ export default function Shipments() {
     return shipments.filter((shipment) => {
       const search = filters.search.trim().toLowerCase();
       const matchesSearch = !search || shipment.clientName.toLowerCase().includes(search);
-      const matchesStatus =
-        filters.status === "All" || shipment.status === filters.status;
+      const matchesStatus = filters.status === "All" || shipment.status === filters.status;
       const matchesAssignment =
         filters.assignment === "All" ||
         (filters.assignment === "Assigned" && shipment.assignedTruckCode) ||
@@ -447,7 +625,7 @@ export default function Shipments() {
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="mt-2 text-slate-600">
               {isAdmin
-                ? "Manage shipment requests, truck assignments, reassignments, and workflow updates."
+                ? "Manage shipment requests, truck assignments, route pricing decisions, and workflow updates."
                 : "Create shipment requests and track the progress of your logistics workflow."}
             </p>
           </div>
@@ -571,7 +749,9 @@ export default function Shipments() {
                   return (
                     <tr key={shipment.id} className="border-t border-slate-200 align-top">
                       <td className="px-6 py-4 font-medium">{shipment.clientName}</td>
-                      <td className="px-6 py-4">{shipment.pickupLocation} → {shipment.dropoffLocation}</td>
+                      <td className="px-6 py-4">
+                        {shipment.pickupLocation} → {shipment.dropoffLocation}
+                      </td>
                       <td className="px-6 py-4">{shipment.shipmentDate}</td>
                       <td className="px-6 py-4">{shipment.truckType}</td>
 
@@ -624,7 +804,9 @@ export default function Shipments() {
                                 })}
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400">No available recommendations</span>
+                              <span className="text-xs text-slate-400">
+                                No available recommendations
+                              </span>
                             )
                           ) : (
                             <span className="text-xs text-slate-400">Not needed</span>
@@ -648,7 +830,9 @@ export default function Shipments() {
                               className={smallSelectClass}
                             >
                               {getNextStatusOptions(shipment.status).map((option) => (
-                                <option key={option} value={option}>{option}</option>
+                                <option key={option} value={option}>
+                                  {option}
+                                </option>
                               ))}
                             </select>
                           </div>
@@ -727,6 +911,9 @@ export default function Shipments() {
           onSubmit={handleShipmentSubmit}
           submitting={submitting}
           error={formError}
+          isAdmin={isAdmin}
+          currency={currency}
+          formatCurrency={formatCurrency}
         />
 
         <ConfirmModal
