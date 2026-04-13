@@ -74,17 +74,30 @@ const createShipment = async (req, res) => {
       !dropoffLocation ||
       !shipmentDate ||
       !truckType ||
-      !status ||
       negotiatedPrice === "" ||
-      commissionAmount === ""
+      negotiatedPrice === null ||
+      negotiatedPrice === undefined ||
+      commissionAmount === "" ||
+      commissionAmount === null ||
+      commissionAmount === undefined
     ) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
+    if (Number.isNaN(Number(negotiatedPrice)) || Number.isNaN(Number(commissionAmount))) {
+      return res.status(400).json({ error: "Price and commission must be valid numbers" });
+    }
+
     const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
 
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ error: "Invalid shipment status" });
+    let finalStatus = "Pending";
+
+    if (req.user.role === "admin" && status) {
+      if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid shipment status" });
+      }
+
+      finalStatus = status;
     }
 
     const result = await pool.query(
@@ -120,9 +133,9 @@ const createShipment = async (req, res) => {
         dropoffLocation,
         shipmentDate,
         truckType,
-        status,
-        negotiatedPrice,
-        commissionAmount,
+        finalStatus,
+        Number(negotiatedPrice),
+        Number(commissionAmount),
         req.user.id,
       ]
     );

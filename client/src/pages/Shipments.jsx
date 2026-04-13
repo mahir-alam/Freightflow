@@ -20,12 +20,9 @@ const initialFormData = {
   dropoffLocation: "",
   shipmentDate: "",
   truckType: "",
-  status: "Pending",
   negotiatedPrice: "",
   commissionAmount: "",
 };
-
-const statusOptions = ["Pending", "Assigned", "In Transit", "Completed"];
 
 const getNextStatusOptions = (currentStatus) => {
   switch (currentStatus) {
@@ -62,8 +59,14 @@ const getRecommendationLabel = (truck, shipment) => {
 };
 
 export default function Shipments() {
+  const storedUser = localStorage.getItem("user");
+  const user = storedUser ? JSON.parse(storedUser) : null;
+  const isAdmin = user?.role === "admin";
+
   const [shipments, setShipments] = useState([]);
-  const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});
+  const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [formData, setFormData] = useState(initialFormData);
@@ -80,6 +83,11 @@ export default function Shipments() {
   };
 
   const fetchRecommendationsForPendingShipments = async (shipmentList) => {
+    if (!isAdmin) {
+      setRecommendedTrucksByShipment({});
+      return;
+    }
+
     try {
       const pendingShipments = shipmentList.filter(
         (shipment) => shipment.status === "Pending" && !shipment.assignedTruckCode
@@ -91,6 +99,7 @@ export default function Shipments() {
             const response = await api.get(
               `/api/shipments/${shipment.id}/recommend-trucks`
             );
+
             return {
               shipmentId: shipment.id,
               trucks: response.data,
@@ -100,6 +109,7 @@ export default function Shipments() {
               `Error fetching recommendations for shipment ${shipment.id}:`,
               error
             );
+
             return {
               shipmentId: shipment.id,
               trucks: [],
@@ -122,7 +132,12 @@ export default function Shipments() {
   const loadPageData = async () => {
     try {
       const shipmentList = await fetchShipments();
-      await fetchRecommendationsForPendingShipments(shipmentList);
+
+      if (isAdmin) {
+        await fetchRecommendationsForPendingShipments(shipmentList);
+      } else {
+        setRecommendedTrucksByShipment({});
+      }
     } catch (error) {
       console.error("Error loading shipments page data:", error);
     } finally {
@@ -176,6 +191,7 @@ export default function Shipments() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
@@ -190,6 +206,7 @@ export default function Shipments() {
     try {
       await api.post("/api/shipments", {
         ...formData,
+        status: "Pending",
         negotiatedPrice: Number(formData.negotiatedPrice),
         commissionAmount: Number(formData.commissionAmount),
       });
@@ -198,16 +215,14 @@ export default function Shipments() {
       await loadPageData();
     } catch (error) {
       console.error("Error creating shipment:", error);
-      setFormError(
-        error.response?.data?.error || "Failed to create shipment"
-      );
+      setFormError(error.response?.data?.error || "Failed to create shipment");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleStatusChange = async (id, newStatus, currentStatus) => {
-    if (newStatus === currentStatus) return;
+    if (!isAdmin || newStatus === currentStatus) return;
 
     try {
       setUpdatingStatusId(id);
@@ -222,7 +237,7 @@ export default function Shipments() {
   };
 
   const handleAssignTruck = async (shipmentId, truckId) => {
-    if (!truckId) return;
+    if (!isAdmin || !truckId) return;
 
     try {
       setAssigningTruckId(shipmentId);
@@ -239,6 +254,8 @@ export default function Shipments() {
   };
 
   const handleDelete = async (id) => {
+    if (!isAdmin) return;
+
     const confirmed = window.confirm(
       "Are you sure you want to delete this shipment?"
     );
@@ -266,8 +283,9 @@ export default function Shipments() {
           <div>
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="mt-2 text-slate-600">
-              Manage shipment requests, track routes, assign trucks, and review
-              negotiated pricing across brokerage operations.
+              {isAdmin
+                ? "Manage shipment requests, assign trucks, and control workflow operations across the brokerage platform."
+                : "Create shipment requests and track the progress of your logistics workflow."}
             </p>
           </div>
 
@@ -294,7 +312,8 @@ export default function Shipments() {
         <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-xl font-semibold">Create Shipment</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Add a new shipment request into the brokerage workflow.
+            Submit a new shipment request. New shipments enter the workflow as
+            Pending and can be assigned later by operations.
           </p>
 
           <form
@@ -345,19 +364,6 @@ export default function Shipments() {
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
             />
 
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            >
-              {statusOptions.map((statusOption) => (
-                <option key={statusOption} value={statusOption}>
-                  {statusOption}
-                </option>
-              ))}
-            </select>
-
             <input
               type="number"
               name="negotiatedPrice"
@@ -375,6 +381,15 @@ export default function Shipments() {
               onChange={handleChange}
               className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
             />
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Initial Status
+              </p>
+              <p className="mt-1 text-sm font-semibold text-amber-700">
+                Pending
+              </p>
+            </div>
 
             <div className="md:col-span-2 xl:col-span-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
@@ -401,6 +416,17 @@ export default function Shipments() {
 
         {loading ? (
           <p className="text-slate-600">Loading shipments...</p>
+        ) : shipments.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">
+              No shipments found
+            </h3>
+            <p className="mt-2 text-sm text-slate-500">
+              {isAdmin
+                ? "No shipment requests have been created yet."
+                : "You have not created any shipment requests yet."}
+            </p>
+          </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
@@ -411,11 +437,11 @@ export default function Shipments() {
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Truck Type</th>
                   <th className="px-6 py-3">Assigned Truck</th>
-                  <th className="px-6 py-3">Recommended Trucks</th>
+                  {isAdmin && <th className="px-6 py-3">Recommended Trucks</th>}
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Price</th>
                   <th className="px-6 py-3">Commission</th>
-                  <th className="px-6 py-3">Actions</th>
+                  {isAdmin && <th className="px-6 py-3">Actions</th>}
                 </tr>
               </thead>
 
@@ -425,7 +451,10 @@ export default function Shipments() {
                     recommendedTrucksByShipment[shipment.id] || [];
 
                   return (
-                    <tr key={shipment.id} className="border-t border-slate-200 align-top">
+                    <tr
+                      key={shipment.id}
+                      className="border-t border-slate-200 align-top"
+                    >
                       <td className="px-6 py-4 font-medium">
                         {shipment.clientName}
                       </td>
@@ -443,7 +472,7 @@ export default function Shipments() {
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
                             {shipment.assignedTruckCode}
                           </span>
-                        ) : shipment.status === "Pending" ? (
+                        ) : isAdmin && shipment.status === "Pending" ? (
                           <select
                             defaultValue=""
                             onChange={(e) =>
@@ -460,55 +489,101 @@ export default function Shipments() {
                             ))}
                           </select>
                         ) : (
-                          <span className="text-xs text-slate-400">Unassigned</span>
-                        )}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {shipment.status === "Pending" && !shipment.assignedTruckCode ? (
-                          recommendedTrucks.length > 0 ? (
-                            <div className="flex flex-col gap-2">
-                              {recommendedTrucks.slice(0, 3).map((truck) => {
-                                const label = getRecommendationLabel(truck, shipment);
-
-                                return (
-                                  <div
-                                    key={truck.id}
-                                    className="flex flex-col rounded-xl bg-slate-50 p-3"
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="text-xs font-semibold text-slate-800">
-                                        {truck.truckCode}
-                                      </span>
-                                      <span
-                                        className={`rounded-full px-2 py-1 text-[10px] font-medium ${getRecommendationBadgeClasses(
-                                          label
-                                        )}`}
-                                      >
-                                        {label}
-                                      </span>
-                                    </div>
-                                    <p className="mt-1 text-[11px] text-slate-500">
-                                      {truck.truckType} • {truck.currentLocation}
-                                    </p>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-400">
-                              No available recommendations
-                            </span>
-                          )
-                        ) : (
                           <span className="text-xs text-slate-400">
-                            Not needed
+                            Not assigned
                           </span>
                         )}
                       </td>
 
+                      {isAdmin && (
+                        <td className="px-6 py-4">
+                          {shipment.status === "Pending" &&
+                          !shipment.assignedTruckCode ? (
+                            recommendedTrucks.length > 0 ? (
+                              <div className="flex flex-col gap-2">
+                                {recommendedTrucks.slice(0, 3).map((truck) => {
+                                  const label = getRecommendationLabel(
+                                    truck,
+                                    shipment
+                                  );
+
+                                  return (
+                                    <div
+                                      key={truck.id}
+                                      className="flex flex-col rounded-xl bg-slate-50 p-3"
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="text-xs font-semibold text-slate-800">
+                                          {truck.truckCode}
+                                        </span>
+                                        <span
+                                          className={`rounded-full px-2 py-1 text-[10px] font-medium ${getRecommendationBadgeClasses(
+                                            label
+                                          )}`}
+                                        >
+                                          {label}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 text-[11px] text-slate-500">
+                                        {truck.truckType} •{" "}
+                                        {truck.currentLocation}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-slate-400">
+                                No available recommendations
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              Not needed
+                            </span>
+                          )}
+                        </td>
+                      )}
+
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
+                        {isAdmin ? (
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
+                                shipment.status
+                              )}`}
+                            >
+                              {shipment.status}
+                            </span>
+
+                            <select
+                              value={shipment.status}
+                              onChange={(e) =>
+                                handleStatusChange(
+                                  shipment.id,
+                                  e.target.value,
+                                  shipment.status
+                                )
+                              }
+                              disabled={
+                                updatingStatusId === shipment.id ||
+                                shipment.status === "Completed"
+                              }
+                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {getNextStatusOptions(shipment.status).map(
+                                (statusOption) => (
+                                  <option
+                                    key={statusOption}
+                                    value={statusOption}
+                                  >
+                                    {statusOption}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </div>
+                        ) : (
                           <span
                             className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
                               shipment.status
@@ -516,29 +591,7 @@ export default function Shipments() {
                           >
                             {shipment.status}
                           </span>
-
-                          <select
-                            value={shipment.status}
-                            onChange={(e) =>
-                              handleStatusChange(
-                                shipment.id,
-                                e.target.value,
-                                shipment.status
-                              )
-                            }
-                            disabled={
-                              updatingStatusId === shipment.id ||
-                              shipment.status === "Completed"
-                            }
-                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {getNextStatusOptions(shipment.status).map((statusOption) => (
-                              <option key={statusOption} value={statusOption}>
-                                {statusOption}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
+                        )}
                       </td>
 
                       <td className="px-6 py-4">
@@ -549,15 +602,17 @@ export default function Shipments() {
                         {formatCurrency(shipment.commissionAmount)}
                       </td>
 
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleDelete(shipment.id)}
-                          disabled={deletingId === shipment.id}
-                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          {deletingId === shipment.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </td>
+                      {isAdmin && (
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleDelete(shipment.id)}
+                            disabled={deletingId === shipment.id}
+                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {deletingId === shipment.id ? "Deleting..." : "Delete"}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
