@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
-import StatCard from "../components/StatCard";
 import {
   BarChart,
   Bar,
@@ -32,7 +31,9 @@ const currencySymbols = {
 const pieColors = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
 const Card = ({ title, subtitle, children, className = "" }) => (
-  <section className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
+  <section
+    className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}
+  >
     {(title || subtitle) && (
       <div className="mb-5">
         {title && <h2 className="text-xl font-semibold">{title}</h2>}
@@ -41,6 +42,22 @@ const Card = ({ title, subtitle, children, className = "" }) => (
     )}
     {children}
   </section>
+);
+
+const MetricCard = ({ title, value, description }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <p className="text-sm font-medium text-slate-500">{title}</p>
+    <h3 className="mt-2 text-3xl font-bold text-slate-900">{value}</h3>
+    <p className="mt-2 text-sm text-slate-500">{description}</p>
+  </div>
+);
+
+const CompactMetricCard = ({ title, value, description }) => (
+  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <p className="text-sm font-medium text-slate-500">{title}</p>
+    <h3 className="mt-2 text-2xl font-bold text-slate-900">{value}</h3>
+    <p className="mt-2 text-xs text-slate-500">{description}</p>
+  </div>
 );
 
 export default function Analytics() {
@@ -107,7 +124,7 @@ export default function Analytics() {
   }, []);
 
   const formatCurrency = (amountInBdt) => {
-    const convertedAmount = Number(amountInBdt) * currencyRates[currency];
+    const convertedAmount = Number(amountInBdt || 0) * currencyRates[currency];
 
     return `${currencySymbols[currency]}${convertedAmount.toLocaleString(
       undefined,
@@ -118,19 +135,27 @@ export default function Analytics() {
     )}`;
   };
 
-  const formatPercent = (value) => `${Number(value).toFixed(1)}%`;
+  const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 
-  const monthlyRevenueChartData = analytics.monthlyRevenueData.map((item) => ({
-    ...item,
-    revenueDisplay: Number(item.revenue) * currencyRates[currency],
-    commissionDisplay: Number(item.commission) * currencyRates[currency],
-  }));
+  const monthlyRevenueChartData = useMemo(() => {
+    return analytics.monthlyRevenueData.map((item) => ({
+      ...item,
+      revenueDisplay: Number(item.revenue || 0) * currencyRates[currency],
+      commissionDisplay: Number(item.commission || 0) * currencyRates[currency],
+    }));
+  }, [analytics.monthlyRevenueData, currency]);
 
-  const pandasMonthlyTrendData = analytics.pandasInsights.monthlyShipmentTrend.map((item) => ({
-    ...item,
-    averagePriceDisplay: Number(item.averagePrice) * currencyRates[currency],
-    totalCommissionDisplay: Number(item.totalCommission) * currencyRates[currency],
-  }));
+  const pandasMonthlyTrendData = useMemo(() => {
+    return analytics.pandasInsights.monthlyShipmentTrend.map((item) => ({
+      ...item,
+      averagePriceDisplay: Number(item.averagePrice || 0) * currencyRates[currency],
+      totalCommissionDisplay:
+        Number(item.totalCommission || 0) * currencyRates[currency],
+    }));
+  }, [analytics.pandasInsights.monthlyShipmentTrend, currency]);
+
+  const hasRevenueTrendData = monthlyRevenueChartData.length > 1;
+  const hasPandasMonthlyTrendData = pandasMonthlyTrendData.length > 1;
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
@@ -170,28 +195,23 @@ export default function Analytics() {
           <p className="text-slate-600">Loading analytics...</p>
         ) : (
           <>
-            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <StatCard
+            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard
                 title="Total Revenue"
                 value={formatCurrency(analytics.revenueSummary.totalRevenue)}
                 description="Total negotiated shipment value"
               />
-              <StatCard
+              <MetricCard
                 title="Total Commission"
                 value={formatCurrency(analytics.revenueSummary.totalCommission)}
                 description="Total brokerage earnings tracked"
               />
-              <StatCard
+              <MetricCard
                 title="Avg Shipment Value"
                 value={formatCurrency(analytics.revenueSummary.averageShipmentValue)}
                 description="Average negotiated value per shipment"
               />
-              <StatCard
-                title="Avg Commission"
-                value={formatCurrency(analytics.revenueSummary.averageCommission)}
-                description="Average commission per shipment"
-              />
-              <StatCard
+              <MetricCard
                 title="Avg Commission Rate"
                 value={formatPercent(analytics.revenueSummary.averageCommissionRate)}
                 description="Average commission as % of shipment value"
@@ -199,53 +219,25 @@ export default function Analytics() {
             </section>
 
             <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard
+              <CompactMetricCard
                 title="Total Shipments"
                 value={analytics.operationsSummary.totalShipments}
-                description="All shipment records in the platform"
+                description="Records in the platform"
               />
-              <StatCard
+              <CompactMetricCard
                 title="Completion Rate"
                 value={formatPercent(analytics.operationsSummary.completionRate)}
-                description="Share of shipments completed"
+                description="Completed shipment share"
               />
-              <StatCard
-                title="Assignment Rate"
-                value={formatPercent(analytics.operationsSummary.assignmentRate)}
-                description="Share of shipments with assigned trucks"
-              />
-              <StatCard
+              <CompactMetricCard
                 title="Truck Utilization"
                 value={formatPercent(analytics.fleetSummary.truckUtilizationRate)}
-                description="Share of fleet currently assigned"
+                description="Fleet currently assigned"
               />
-            </section>
-
-            <section className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <StatCard
+              <CompactMetricCard
                 title="Pandas Avg Margin"
                 value={formatPercent(analytics.pandasInsights.summary.averageMarginPercent)}
-                description="Average margin computed from Python analytics"
-              />
-              <StatCard
-                title="Highest Margin"
-                value={formatPercent(analytics.pandasInsights.summary.highestMarginPercent)}
-                description="Best margin identified across shipments"
-              />
-              <StatCard
-                title="Lowest Margin"
-                value={formatPercent(analytics.pandasInsights.summary.lowestMarginPercent)}
-                description="Weakest margin identified across shipments"
-              />
-              <StatCard
-                title="Shipments Analyzed"
-                value={analytics.pandasInsights.summary.shipmentCountAnalyzed}
-                description="Records processed in Pandas layer"
-              />
-              <StatCard
-                title="Trucks Analyzed"
-                value={analytics.pandasInsights.summary.truckCountAnalyzed}
-                description="Fleet records included in analysis"
+                description="Average margin from analytics layer"
               />
             </section>
 
@@ -303,28 +295,34 @@ export default function Analytics() {
                 subtitle="Revenue and commission across shipment months"
               >
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={monthlyRevenueChartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="revenueDisplay"
-                        name="Revenue"
-                        stroke="#2563eb"
-                        strokeWidth={3}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="commissionDisplay"
-                        name="Commission"
-                        stroke="#10b981"
-                        strokeWidth={3}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {hasRevenueTrendData ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={monthlyRevenueChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="revenueDisplay"
+                          name="Revenue"
+                          stroke="#2563eb"
+                          strokeWidth={3}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="commissionDisplay"
+                          name="Commission"
+                          stroke="#10b981"
+                          strokeWidth={3}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500">
+                      Add more monthly shipment history to show a stronger revenue trend.
+                    </div>
+                  )}
                 </div>
               </Card>
 
@@ -333,15 +331,25 @@ export default function Analytics() {
                 subtitle="Monthly demand and margin-related trend summary"
               >
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={pandasMonthlyTrendData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="shipmentMonth" />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Bar dataKey="shipmentCount" name="Shipments" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {hasPandasMonthlyTrendData ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={pandasMonthlyTrendData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="shipmentMonth" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Bar
+                          dataKey="shipmentCount"
+                          name="Shipments"
+                          radius={[8, 8, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex h-full items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500">
+                      Add more monthly shipment data to make this trend more meaningful.
+                    </div>
+                  )}
                 </div>
               </Card>
             </section>
@@ -352,7 +360,9 @@ export default function Analytics() {
                 subtitle="Routes ranked by total commission and margin quality"
               >
                 {analytics.pandasInsights.mostProfitableRoutes.length === 0 ? (
-                  <p className="text-sm text-slate-500">No Pandas route profitability data available.</p>
+                  <p className="text-sm text-slate-500">
+                    No route profitability data available.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {analytics.pandasInsights.mostProfitableRoutes.map((route, index) => (
@@ -369,13 +379,13 @@ export default function Analytics() {
                           </div>
                           <div className="text-sm text-slate-600">
                             <div>
-                              Commission:{" "}
+                              Commission{" "}
                               <span className="font-semibold text-slate-900">
                                 {formatCurrency(route.totalCommission)}
                               </span>
                             </div>
                             <div>
-                              Avg margin:{" "}
+                              Avg margin{" "}
                               <span className="font-semibold text-slate-900">
                                 {formatPercent(route.averageMarginPercent)}
                               </span>
@@ -393,7 +403,9 @@ export default function Analytics() {
                 subtitle="Routes that may need pricing review or margin improvement"
               >
                 {analytics.pandasInsights.lowestMarginRoutes.length === 0 ? (
-                  <p className="text-sm text-slate-500">No low-margin route data available.</p>
+                  <p className="text-sm text-slate-500">
+                    No low-margin route data available.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {analytics.pandasInsights.lowestMarginRoutes.map((route, index) => (
@@ -410,13 +422,13 @@ export default function Analytics() {
                           </div>
                           <div className="text-sm text-slate-600">
                             <div>
-                              Avg price:{" "}
+                              Avg price{" "}
                               <span className="font-semibold text-slate-900">
                                 {formatCurrency(route.averagePrice)}
                               </span>
                             </div>
                             <div>
-                              Avg margin:{" "}
+                              Avg margin{" "}
                               <span className="font-semibold text-slate-900">
                                 {formatPercent(route.averageMarginPercent)}
                               </span>
@@ -454,7 +466,9 @@ export default function Analytics() {
                             <td className="px-4 py-3 font-medium">{route.route}</td>
                             <td className="px-4 py-3">{route.shipmentCount}</td>
                             <td className="px-4 py-3">{formatCurrency(route.averagePrice)}</td>
-                            <td className="px-4 py-3">{formatPercent(route.averageMarginPercent)}</td>
+                            <td className="px-4 py-3">
+                              {formatPercent(route.averageMarginPercent)}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -468,7 +482,9 @@ export default function Analytics() {
                 subtitle="Profitability and demand by shipment truck type"
               >
                 {analytics.pandasInsights.truckTypeProfitability.length === 0 ? (
-                  <p className="text-sm text-slate-500">No truck type profitability data available.</p>
+                  <p className="text-sm text-slate-500">
+                    No truck type profitability data available.
+                  </p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
@@ -481,14 +497,20 @@ export default function Analytics() {
                         </tr>
                       </thead>
                       <tbody>
-                        {analytics.pandasInsights.truckTypeProfitability.map((item, index) => (
-                          <tr key={index} className="border-b border-slate-100">
-                            <td className="px-4 py-3 font-medium">{item.truckType}</td>
-                            <td className="px-4 py-3">{item.shipmentCount}</td>
-                            <td className="px-4 py-3">{formatCurrency(item.averagePrice)}</td>
-                            <td className="px-4 py-3">{formatCurrency(item.totalCommission)}</td>
-                          </tr>
-                        ))}
+                        {analytics.pandasInsights.truckTypeProfitability.map(
+                          (item, index) => (
+                            <tr key={index} className="border-b border-slate-100">
+                              <td className="px-4 py-3 font-medium">{item.truckType}</td>
+                              <td className="px-4 py-3">{item.shipmentCount}</td>
+                              <td className="px-4 py-3">
+                                {formatCurrency(item.averagePrice)}
+                              </td>
+                              <td className="px-4 py-3">
+                                {formatCurrency(item.totalCommission)}
+                              </td>
+                            </tr>
+                          )
+                        )}
                       </tbody>
                     </table>
                   </div>
