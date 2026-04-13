@@ -2,18 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import api from "../services/api";
+import useDisplayCurrency from "../hooks/useDisplayCurrency";
 
-const currencyRates = {
-  BDT: 1,
-  USD: 1 / 110,
-  CAD: 1 / 81,
-};
-
-const currencySymbols = {
-  BDT: "৳",
-  USD: "$",
-  CAD: "C$",
-};
 
 const Card = ({ title, subtitle, right, children, className = "" }) => (
   <section
@@ -82,23 +72,11 @@ const InsightPill = ({ label, tone = "neutral" }) => {
 };
 
 export default function Dashboard() {
-  const [currency, setCurrency] = useState("BDT");
+  const { currency, setCurrency, formatCurrency } = useDisplayCurrency();
   const [shipments, setShipments] = useState([]);
   const [trucks, setTrucks] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  const formatCurrency = (amountInBdt) => {
-    const convertedAmount = Number(amountInBdt || 0) * currencyRates[currency];
-
-    return `${currencySymbols[currency]}${convertedAmount.toLocaleString(
-      undefined,
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    )}`;
-  };
 
   useEffect(() => {
     const loadDashboard = async () => {

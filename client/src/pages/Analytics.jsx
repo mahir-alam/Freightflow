@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
+import useDisplayCurrency, { currencyRates } from "../hooks/useDisplayCurrency";
 import {
   BarChart,
   Bar,
@@ -16,17 +17,6 @@ import {
   CartesianGrid,
 } from "recharts";
 
-const currencyRates = {
-  BDT: 1,
-  USD: 1 / 110,
-  CAD: 1 / 81,
-};
-
-const currencySymbols = {
-  BDT: "৳",
-  USD: "$",
-  CAD: "C$",
-};
 
 const pieColors = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"];
 
@@ -105,7 +95,7 @@ export default function Analytics() {
     },
   });
 
-  const [currency, setCurrency] = useState("BDT");
+  const { currency, setCurrency, formatCurrency } = useDisplayCurrency();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -122,18 +112,6 @@ export default function Analytics() {
 
     fetchAnalytics();
   }, []);
-
-  const formatCurrency = (amountInBdt) => {
-    const convertedAmount = Number(amountInBdt || 0) * currencyRates[currency];
-
-    return `${currencySymbols[currency]}${convertedAmount.toLocaleString(
-      undefined,
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    )}`;
-  };
 
   const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
+import useDisplayCurrency from "../hooks/useDisplayCurrency";
 
-const currencyRates = { BDT: 1, USD: 1 / 110, CAD: 1 / 81 };
-const currencySymbols = { BDT: "৳", USD: "$", CAD: "C$" };
 
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
@@ -579,7 +578,7 @@ export default function Shipments() {
   const [shipments, setShipments] = useState([]);
   const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});
   const [loading, setLoading] = useState(true);
-  const [currency, setCurrency] = useState("BDT");
+  const { currency, setCurrency, formatCurrency } = useDisplayCurrency();
   const [filters, setFilters] = useState(initialFilters);
 
   const [shipmentForm, setShipmentForm] = useState(initialFormData);
@@ -596,14 +595,6 @@ export default function Shipments() {
   const [unassigningId, setUnassigningId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [assigningTruckId, setAssigningTruckId] = useState(null);
-
-  const formatCurrency = (amount) => {
-    const converted = Number(amount || 0) * currencyRates[currency];
-    return `${currencySymbols[currency]}${converted.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  };
 
   const fetchShipments = async () => {
     const response = await api.get("/api/shipments");
