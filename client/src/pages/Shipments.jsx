@@ -2,17 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
 
-const currencyRates = {
-  BDT: 1,
-  USD: 1 / 110,
-  CAD: 1 / 81,
-};
-
-const currencySymbols = {
-  BDT: "৳",
-  USD: "$",
-  CAD: "C$",
-};
+const currencyRates = { BDT: 1, USD: 1 / 110, CAD: 1 / 81 };
+const currencySymbols = { BDT: "৳", USD: "$", CAD: "C$" };
 
 const initialFormData = {
   clientName: "",
@@ -30,19 +21,30 @@ const initialFilters = {
   assignment: "All",
 };
 
-const getNextStatusOptions = (currentStatus) => {
-  switch (currentStatus) {
-    case "Pending":
-      return ["Pending", "Assigned"];
-    case "Assigned":
-      return ["Assigned", "In Transit"];
-    case "In Transit":
-      return ["In Transit", "Completed"];
-    case "Completed":
-      return ["Completed"];
-    default:
-      return [currentStatus];
-  }
+const inputClass =
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
+const smallSelectClass =
+  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70";
+
+const statusColors = {
+  Pending: "bg-amber-50 text-amber-700",
+  Assigned: "bg-blue-50 text-blue-700",
+  "In Transit": "bg-purple-50 text-purple-700",
+  Completed: "bg-emerald-50 text-emerald-700",
+};
+
+const recommendationColors = {
+  "Best match": "bg-emerald-50 text-emerald-700",
+  "Type match": "bg-blue-50 text-blue-700",
+  "Location match": "bg-amber-50 text-amber-700",
+  "Available fallback": "bg-slate-100 text-slate-700",
+};
+
+const getNextStatusOptions = (status) => {
+  if (status === "Pending") return ["Pending", "Assigned"];
+  if (status === "Assigned") return ["Assigned", "In Transit"];
+  if (status === "In Transit") return ["In Transit", "Completed"];
+  return ["Completed"];
 };
 
 const getRecommendationLabel = (truck, shipment) => {
@@ -52,17 +54,38 @@ const getRecommendationLabel = (truck, shipment) => {
   ) {
     return "Best match";
   }
-
-  if (truck.truckType === shipment.truckType) {
-    return "Type match";
-  }
-
-  if (truck.currentLocation === shipment.pickupLocation) {
-    return "Location match";
-  }
-
+  if (truck.truckType === shipment.truckType) return "Type match";
+  if (truck.currentLocation === shipment.pickupLocation) return "Location match";
   return "Available fallback";
 };
+
+const Card = ({ title, subtitle, right, children, className = "" }) => (
+  <section className={`rounded-2xl border border-slate-200 bg-white p-6 shadow-sm ${className}`}>
+    {(title || subtitle || right) && (
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          {title && <h2 className="text-xl font-semibold">{title}</h2>}
+          {subtitle && <p className="mt-1 text-sm text-slate-500">{subtitle}</p>}
+        </div>
+        {right}
+      </div>
+    )}
+    {children}
+  </section>
+);
+
+const Field = ({ label, children }) => (
+  <div>
+    {label && <label className="mb-2 block text-sm font-medium text-slate-600">{label}</label>}
+    {children}
+  </div>
+);
+
+const Badge = ({ text, colorClass }) => (
+  <span className={`rounded-full px-3 py-1 text-xs font-medium ${colorClass}`}>
+    {text}
+  </span>
+);
 
 export default function Shipments() {
   const storedUser = localStorage.getItem("user");
@@ -70,9 +93,7 @@ export default function Shipments() {
   const isAdmin = user?.role === "admin";
 
   const [shipments, setShipments] = useState([]);
-  const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState(
-    {}
-  );
+  const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
   const [formData, setFormData] = useState(initialFormData);
@@ -83,70 +104,50 @@ export default function Shipments() {
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [assigningTruckId, setAssigningTruckId] = useState(null);
 
-  const fetchShipments = async () => {
-    const response = await api.get("/api/shipments");
-    setShipments(response.data);
-    return response.data;
+  const formatCurrency = (amount) => {
+    const converted = Number(amount) * currencyRates[currency];
+    return `${currencySymbols[currency]}${converted.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
   };
 
-  const fetchRecommendationsForPendingShipments = async (shipmentList) => {
+  const fetchShipments = async () => {
+    const res = await api.get("/api/shipments");
+    setShipments(res.data);
+    return res.data;
+  };
+
+  const fetchRecommendations = async (shipmentList) => {
     if (!isAdmin) {
       setRecommendedTrucksByShipment({});
       return;
     }
 
-    try {
-      const pendingShipments = shipmentList.filter(
-        (shipment) => shipment.status === "Pending" && !shipment.assignedTruckCode
-      );
+    const pending = shipmentList.filter(
+      (s) => s.status === "Pending" && !s.assignedTruckCode
+    );
 
-      const recommendationResults = await Promise.all(
-        pendingShipments.map(async (shipment) => {
-          try {
-            const response = await api.get(
-              `/api/shipments/${shipment.id}/recommend-trucks`
-            );
+    const results = await Promise.all(
+      pending.map(async (shipment) => {
+        try {
+          const res = await api.get(`/api/shipments/${shipment.id}/recommend-trucks`);
+          return [shipment.id, res.data];
+        } catch {
+          return [shipment.id, []];
+        }
+      })
+    );
 
-            return {
-              shipmentId: shipment.id,
-              trucks: response.data,
-            };
-          } catch (error) {
-            console.error(
-              `Error fetching recommendations for shipment ${shipment.id}:`,
-              error
-            );
-
-            return {
-              shipmentId: shipment.id,
-              trucks: [],
-            };
-          }
-        })
-      );
-
-      const mappedRecommendations = {};
-      recommendationResults.forEach((item) => {
-        mappedRecommendations[item.shipmentId] = item.trucks;
-      });
-
-      setRecommendedTrucksByShipment(mappedRecommendations);
-    } catch (error) {
-      console.error("Error fetching truck recommendations:", error);
-    }
+    setRecommendedTrucksByShipment(Object.fromEntries(results));
   };
 
   const loadPageData = async () => {
     try {
       const shipmentList = await fetchShipments();
-
-      if (isAdmin) {
-        await fetchRecommendationsForPendingShipments(shipmentList);
-      } else {
-        setRecommendedTrucksByShipment({});
-      }
+      await fetchRecommendations(shipmentList);
     } catch (error) {
-      console.error("Error loading shipments page data:", error);
+      console.error("Error loading shipments:", error);
     } finally {
       setLoading(false);
     }
@@ -158,13 +159,10 @@ export default function Shipments() {
 
   const filteredShipments = useMemo(() => {
     return shipments.filter((shipment) => {
-      const matchesSearch = shipment.clientName
-        .toLowerCase()
-        .includes(filters.search.toLowerCase());
-
+      const search = filters.search.trim().toLowerCase();
+      const matchesSearch = !search || shipment.clientName.toLowerCase().includes(search);
       const matchesStatus =
         filters.status === "All" || shipment.status === filters.status;
-
       const matchesAssignment =
         filters.assignment === "All" ||
         (filters.assignment === "Assigned" && shipment.assignedTruckCode) ||
@@ -174,67 +172,13 @@ export default function Shipments() {
     });
   }, [shipments, filters]);
 
-  const formatCurrency = (amountInBdt) => {
-    const convertedAmount = Number(amountInBdt) * currencyRates[currency];
+  const handleFormChange = (e) =>
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-    return `${currencySymbols[currency]}${convertedAmount.toLocaleString(
-      undefined,
-      {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }
-    )}`;
-  };
+  const handleFilterChange = (e) =>
+    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const getStatusClasses = (status) => {
-    switch (status) {
-      case "Pending":
-        return "bg-amber-50 text-amber-700";
-      case "Assigned":
-        return "bg-blue-50 text-blue-700";
-      case "In Transit":
-        return "bg-purple-50 text-purple-700";
-      case "Completed":
-        return "bg-emerald-50 text-emerald-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
-
-  const getRecommendationBadgeClasses = (label) => {
-    switch (label) {
-      case "Best match":
-        return "bg-emerald-50 text-emerald-700";
-      case "Type match":
-        return "bg-blue-50 text-blue-700";
-      case "Location match":
-        return "bg-amber-50 text-amber-700";
-      default:
-        return "bg-slate-100 text-slate-700";
-    }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-
-    setFilters((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const clearFilters = () => {
-    setFilters(initialFilters);
-  };
+  const clearFilters = () => setFilters(initialFilters);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -248,7 +192,6 @@ export default function Shipments() {
         negotiatedPrice: Number(formData.negotiatedPrice),
         commissionAmount: Number(formData.commissionAmount),
       });
-
       setFormData(initialFormData);
       await loadPageData();
     } catch (error) {
@@ -259,15 +202,14 @@ export default function Shipments() {
     }
   };
 
-  const handleStatusChange = async (id, newStatus, currentStatus) => {
-    if (!isAdmin || newStatus === currentStatus) return;
+  const handleStatusChange = async (id, nextStatus, currentStatus) => {
+    if (!isAdmin || nextStatus === currentStatus) return;
 
     try {
       setUpdatingStatusId(id);
-      await api.patch(`/api/shipments/${id}/status`, { status: newStatus });
+      await api.patch(`/api/shipments/${id}/status`, { status: nextStatus });
       await loadPageData();
     } catch (error) {
-      console.error("Error updating shipment status:", error);
       alert(error.response?.data?.error || "Failed to update shipment status");
     } finally {
       setUpdatingStatusId(null);
@@ -284,7 +226,6 @@ export default function Shipments() {
       });
       await loadPageData();
     } catch (error) {
-      console.error("Error assigning truck:", error);
       alert(error.response?.data?.error || "Failed to assign truck");
     } finally {
       setAssigningTruckId(null);
@@ -293,19 +234,13 @@ export default function Shipments() {
 
   const handleDelete = async (id) => {
     if (!isAdmin) return;
-
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this shipment?"
-    );
-
-    if (!confirmed) return;
+    if (!window.confirm("Are you sure you want to delete this shipment?")) return;
 
     try {
       setDeletingId(id);
       await api.delete(`/api/shipments/${id}`);
       await loadPageData();
     } catch (error) {
-      console.error("Error deleting shipment:", error);
       alert(error.response?.data?.error || "Failed to delete shipment");
     } finally {
       setDeletingId(null);
@@ -327,119 +262,44 @@ export default function Shipments() {
             </p>
           </div>
 
-          <div className="w-full md:w-52">
-            <label
-              htmlFor="currency"
-              className="mb-2 block text-sm font-medium text-slate-600"
-            >
-              Display Currency
-            </label>
+          <Field label="Display Currency">
             <select
-              id="currency"
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm outline-none focus:border-blue-500"
+              className="w-full min-w-[180px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm outline-none focus:border-blue-500"
             >
               <option value="BDT">BDT</option>
               <option value="CAD">CAD</option>
               <option value="USD">USD</option>
             </select>
-          </div>
+          </Field>
         </div>
 
-        <section className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Create Shipment</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Submit a new shipment request. New shipments enter the workflow as
-            Pending and can be assigned later by operations.
-          </p>
-
-          <form
-            onSubmit={handleSubmit}
-            className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
-          >
-            <input
-              type="text"
-              name="clientName"
-              placeholder="Client name"
-              value={formData.clientName}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="text"
-              name="pickupLocation"
-              placeholder="Pickup location"
-              value={formData.pickupLocation}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="text"
-              name="dropoffLocation"
-              placeholder="Dropoff location"
-              value={formData.dropoffLocation}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="date"
-              name="shipmentDate"
-              value={formData.shipmentDate}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="text"
-              name="truckType"
-              placeholder="Truck type"
-              value={formData.truckType}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="number"
-              name="negotiatedPrice"
-              placeholder="Negotiated price (BDT)"
-              value={formData.negotiatedPrice}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
-
-            <input
-              type="number"
-              name="commissionAmount"
-              placeholder="Commission amount (BDT)"
-              value={formData.commissionAmount}
-              onChange={handleChange}
-              className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-            />
+        <Card
+          title="Create Shipment"
+          subtitle="Submit a new shipment request. New shipments enter the workflow as Pending and can be assigned later by operations."
+          className="mb-8"
+        >
+          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <input className={inputClass} name="clientName" placeholder="Client name" value={formData.clientName} onChange={handleFormChange} />
+            <input className={inputClass} name="pickupLocation" placeholder="Pickup location" value={formData.pickupLocation} onChange={handleFormChange} />
+            <input className={inputClass} name="dropoffLocation" placeholder="Dropoff location" value={formData.dropoffLocation} onChange={handleFormChange} />
+            <input className={inputClass} type="date" name="shipmentDate" value={formData.shipmentDate} onChange={handleFormChange} />
+            <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={handleFormChange} />
+            <input className={inputClass} type="number" name="negotiatedPrice" placeholder="Negotiated price (BDT)" value={formData.negotiatedPrice} onChange={handleFormChange} />
+            <input className={inputClass} type="number" name="commissionAmount" placeholder="Commission amount (BDT)" value={formData.commissionAmount} onChange={handleFormChange} />
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Initial Status
               </p>
-              <p className="mt-1 text-sm font-semibold text-amber-700">
-                Pending
-              </p>
+              <p className="mt-1 text-sm font-semibold text-amber-700">Pending</p>
             </div>
 
-            <div className="md:col-span-2 xl:col-span-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                {formError ? (
-                  <p className="text-sm font-medium text-red-600">{formError}</p>
-                ) : (
-                  <p className="text-sm text-slate-500">
-                    Prices are stored in BDT and displayed in your selected
-                    currency.
-                  </p>
-                )}
-              </div>
+            <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
+              <p className={`text-sm ${formError ? "font-medium text-red-600" : "text-slate-500"}`}>
+                {formError || "Prices are stored in BDT and displayed in your selected currency."}
+              </p>
 
               <button
                 type="submit"
@@ -450,78 +310,47 @@ export default function Shipments() {
               </button>
             </div>
           </form>
-        </section>
+        </Card>
 
-        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Search & Filters</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Narrow down shipments by client, workflow status, or assignment state.
-              </p>
-            </div>
-
+        <Card
+          title="Search & Filters"
+          subtitle="Narrow down shipments by client, workflow status, or assignment state."
+          right={
             <div className="text-sm text-slate-500">
-              Showing{" "}
-              <span className="font-semibold text-slate-800">
-                {filteredShipments.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-semibold text-slate-800">
-                {shipments.length}
-              </span>{" "}
-              shipments
+              Showing <span className="font-semibold text-slate-800">{filteredShipments.length}</span> of{" "}
+              <span className="font-semibold text-slate-800">{shipments.length}</span> shipments
             </div>
-          </div>
-
+          }
+          className="mb-6"
+        >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-600">
-                Search by Client
-              </label>
+            <Field label="Search by Client">
               <input
-                type="text"
+                className={inputClass}
                 name="search"
                 placeholder="Search client name"
                 value={filters.search}
                 onChange={handleFilterChange}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
               />
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-600">
-                Status
-              </label>
-              <select
-                name="status"
-                value={filters.status}
-                onChange={handleFilterChange}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-              >
+            <Field label="Status">
+              <select className={inputClass} name="status" value={filters.status} onChange={handleFilterChange}>
                 <option value="All">All statuses</option>
                 <option value="Pending">Pending</option>
                 <option value="Assigned">Assigned</option>
                 <option value="In Transit">In Transit</option>
                 <option value="Completed">Completed</option>
               </select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-600">
-                Assignment
-              </label>
-              <select
-                name="assignment"
-                value={filters.assignment}
-                onChange={handleFilterChange}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
-              >
+            <Field label="Assignment">
+              <select className={inputClass} name="assignment" value={filters.assignment} onChange={handleFilterChange}>
                 <option value="All">All shipments</option>
                 <option value="Assigned">Assigned only</option>
                 <option value="Unassigned">Unassigned only</option>
               </select>
-            </div>
+            </Field>
 
             <div className="flex items-end">
               <button
@@ -533,23 +362,25 @@ export default function Shipments() {
               </button>
             </div>
           </div>
-        </section>
+        </Card>
 
         {loading ? (
           <p className="text-slate-600">Loading shipments...</p>
         ) : filteredShipments.length === 0 ? (
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">
-              {shipments.length === 0 ? "No shipments found" : "No matching shipments"}
-            </h3>
-            <p className="mt-2 text-sm text-slate-500">
-              {shipments.length === 0
-                ? isAdmin
-                  ? "No shipment requests have been created yet."
-                  : "You have not created any shipment requests yet."
-                : "Try adjusting your search or filter settings to see more results."}
-            </p>
-          </div>
+          <Card>
+            <div className="py-2 text-center">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {shipments.length === 0 ? "No shipments found" : "No matching shipments"}
+              </h3>
+              <p className="mt-2 text-sm text-slate-500">
+                {shipments.length === 0
+                  ? isAdmin
+                    ? "No shipment requests have been created yet."
+                    : "You have not created any shipment requests yet."
+                  : "Try adjusting your search or filter settings to see more results."}
+              </p>
+            </div>
+          </Card>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
             <table className="min-w-full text-sm">
@@ -570,39 +401,24 @@ export default function Shipments() {
 
               <tbody>
                 {filteredShipments.map((shipment) => {
-                  const recommendedTrucks =
-                    recommendedTrucksByShipment[shipment.id] || [];
+                  const recommendedTrucks = recommendedTrucksByShipment[shipment.id] || [];
 
                   return (
-                    <tr
-                      key={shipment.id}
-                      className="border-t border-slate-200 align-top"
-                    >
-                      <td className="px-6 py-4 font-medium">
-                        {shipment.clientName}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {shipment.pickupLocation} → {shipment.dropoffLocation}
-                      </td>
-
+                    <tr key={shipment.id} className="border-t border-slate-200 align-top">
+                      <td className="px-6 py-4 font-medium">{shipment.clientName}</td>
+                      <td className="px-6 py-4">{shipment.pickupLocation} → {shipment.dropoffLocation}</td>
                       <td className="px-6 py-4">{shipment.shipmentDate}</td>
-
                       <td className="px-6 py-4">{shipment.truckType}</td>
 
                       <td className="px-6 py-4">
                         {shipment.assignedTruckCode ? (
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-                            {shipment.assignedTruckCode}
-                          </span>
+                          <Badge text={shipment.assignedTruckCode} colorClass="bg-slate-100 text-slate-700" />
                         ) : isAdmin && shipment.status === "Pending" ? (
                           <select
                             defaultValue=""
-                            onChange={(e) =>
-                              handleAssignTruck(shipment.id, e.target.value)
-                            }
+                            onChange={(e) => handleAssignTruck(shipment.id, e.target.value)}
                             disabled={assigningTruckId === shipment.id}
-                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                            className={smallSelectClass}
                           >
                             <option value="">Assign truck</option>
                             {recommendedTrucks.map((truck) => (
@@ -612,58 +428,41 @@ export default function Shipments() {
                             ))}
                           </select>
                         ) : (
-                          <span className="text-xs text-slate-400">
-                            Not assigned
-                          </span>
+                          <span className="text-xs text-slate-400">Not assigned</span>
                         )}
                       </td>
 
                       {isAdmin && (
                         <td className="px-6 py-4">
-                          {shipment.status === "Pending" &&
-                          !shipment.assignedTruckCode ? (
+                          {shipment.status === "Pending" && !shipment.assignedTruckCode ? (
                             recommendedTrucks.length > 0 ? (
                               <div className="flex flex-col gap-2">
                                 {recommendedTrucks.slice(0, 3).map((truck) => {
-                                  const label = getRecommendationLabel(
-                                    truck,
-                                    shipment
-                                  );
-
+                                  const label = getRecommendationLabel(truck, shipment);
                                   return (
-                                    <div
-                                      key={truck.id}
-                                      className="flex flex-col rounded-xl bg-slate-50 p-3"
-                                    >
+                                    <div key={truck.id} className="rounded-xl bg-slate-50 p-3">
                                       <div className="flex items-center justify-between gap-2">
                                         <span className="text-xs font-semibold text-slate-800">
                                           {truck.truckCode}
                                         </span>
                                         <span
-                                          className={`rounded-full px-2 py-1 text-[10px] font-medium ${getRecommendationBadgeClasses(
-                                            label
-                                          )}`}
+                                          className={`rounded-full px-2 py-1 text-[10px] font-medium ${recommendationColors[label]}`}
                                         >
                                           {label}
                                         </span>
                                       </div>
                                       <p className="mt-1 text-[11px] text-slate-500">
-                                        {truck.truckType} •{" "}
-                                        {truck.currentLocation}
+                                        {truck.truckType} • {truck.currentLocation}
                                       </p>
                                     </div>
                                   );
                                 })}
                               </div>
                             ) : (
-                              <span className="text-xs text-slate-400">
-                                No available recommendations
-                              </span>
+                              <span className="text-xs text-slate-400">No available recommendations</span>
                             )
                           ) : (
-                            <span className="text-xs text-slate-400">
-                              Not needed
-                            </span>
+                            <span className="text-xs text-slate-400">Not needed</span>
                           )}
                         </td>
                       )}
@@ -671,59 +470,27 @@ export default function Shipments() {
                       <td className="px-6 py-4">
                         {isAdmin ? (
                           <div className="flex items-center gap-2">
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
-                                shipment.status
-                              )}`}
-                            >
-                              {shipment.status}
-                            </span>
-
+                            <Badge text={shipment.status} colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"} />
                             <select
                               value={shipment.status}
                               onChange={(e) =>
-                                handleStatusChange(
-                                  shipment.id,
-                                  e.target.value,
-                                  shipment.status
-                                )
+                                handleStatusChange(shipment.id, e.target.value, shipment.status)
                               }
-                              disabled={
-                                updatingStatusId === shipment.id ||
-                                shipment.status === "Completed"
-                              }
-                              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={updatingStatusId === shipment.id || shipment.status === "Completed"}
+                              className={smallSelectClass}
                             >
-                              {getNextStatusOptions(shipment.status).map(
-                                (statusOption) => (
-                                  <option
-                                    key={statusOption}
-                                    value={statusOption}
-                                  >
-                                    {statusOption}
-                                  </option>
-                                )
-                              )}
+                              {getNextStatusOptions(shipment.status).map((option) => (
+                                <option key={option} value={option}>{option}</option>
+                              ))}
                             </select>
                           </div>
                         ) : (
-                          <span
-                            className={`rounded-full px-3 py-1 text-xs font-medium ${getStatusClasses(
-                              shipment.status
-                            )}`}
-                          >
-                            {shipment.status}
-                          </span>
+                          <Badge text={shipment.status} colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"} />
                         )}
                       </td>
 
-                      <td className="px-6 py-4">
-                        {formatCurrency(shipment.negotiatedPrice)}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {formatCurrency(shipment.commissionAmount)}
-                      </td>
+                      <td className="px-6 py-4">{formatCurrency(shipment.negotiatedPrice)}</td>
+                      <td className="px-6 py-4">{formatCurrency(shipment.commissionAmount)}</td>
 
                       {isAdmin && (
                         <td className="px-6 py-4">
