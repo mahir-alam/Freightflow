@@ -49,16 +49,6 @@ const createTruck = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (Number.isNaN(Number(capacityTons))) {
-      return res.status(400).json({ error: "Capacity must be a valid number" });
-    }
-
-    const allowedStatuses = ["Available", "Assigned", "Unavailable"];
-
-    if (!allowedStatuses.includes(availabilityStatus)) {
-      return res.status(400).json({ error: "Invalid availability status" });
-    }
-
     const result = await pool.query(
       `
       INSERT INTO trucks (
@@ -94,7 +84,7 @@ const createTruck = async (req, res) => {
   }
 };
 
-const updateTruckDetails = async (req, res) => {
+const updateTruck = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -119,19 +109,9 @@ const updateTruckDetails = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (Number.isNaN(Number(capacityTons))) {
-      return res.status(400).json({ error: "Capacity must be a valid number" });
-    }
-
-    const allowedStatuses = ["Available", "Assigned", "Unavailable"];
-
-    if (!allowedStatuses.includes(availabilityStatus)) {
-      return res.status(400).json({ error: "Invalid availability status" });
-    }
-
     const existingTruck = await pool.query(
       `
-      SELECT id, availability_status
+      SELECT id
       FROM trucks
       WHERE id = $1
       `,
@@ -140,16 +120,6 @@ const updateTruckDetails = async (req, res) => {
 
     if (existingTruck.rowCount === 0) {
       return res.status(404).json({ error: "Truck not found" });
-    }
-
-    if (
-      existingTruck.rows[0].availability_status === "Assigned" &&
-      availabilityStatus !== "Assigned"
-    ) {
-      return res.status(400).json({
-        error:
-          "Assigned trucks cannot be changed to another availability status here. Unassign the shipment first.",
-      });
     }
 
     const result = await pool.query(
@@ -178,13 +148,13 @@ const updateTruckDetails = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Error updating truck details:", error.message);
+    console.error("Error updating truck:", error.message);
 
     if (error.code === "23505") {
       return res.status(400).json({ error: "Truck number already exists" });
     }
 
-    res.status(500).json({ error: "Failed to update truck details" });
+    res.status(500).json({ error: "Failed to update truck" });
   }
 };
 
@@ -199,29 +169,6 @@ const updateTruckAvailability = async (req, res) => {
       return res.status(400).json({ error: "Invalid availability status" });
     }
 
-    const truckCheck = await pool.query(
-      `
-      SELECT id, availability_status
-      FROM trucks
-      WHERE id = $1
-      `,
-      [id]
-    );
-
-    if (truckCheck.rowCount === 0) {
-      return res.status(404).json({ error: "Truck not found" });
-    }
-
-    if (
-      truckCheck.rows[0].availability_status === "Assigned" &&
-      availabilityStatus !== "Assigned"
-    ) {
-      return res.status(400).json({
-        error:
-          "Assigned trucks cannot be changed to another availability status here. Unassign the shipment first.",
-      });
-    }
-
     const result = await pool.query(
       `
       UPDATE trucks
@@ -231,6 +178,10 @@ const updateTruckAvailability = async (req, res) => {
       `,
       [availabilityStatus, id]
     );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Truck not found" });
+    }
 
     res.json(result.rows[0]);
   } catch (error) {
@@ -282,7 +233,7 @@ const deleteTruck = async (req, res) => {
 module.exports = {
   getAllTrucks,
   createTruck,
-  updateTruckDetails,
+  updateTruck,
   updateTruckAvailability,
   deleteTruck,
 };

@@ -5,22 +5,6 @@ import api from "../services/api";
 const currencyRates = { BDT: 1, USD: 1 / 110, CAD: 1 / 81 };
 const currencySymbols = { BDT: "৳", USD: "$", CAD: "C$" };
 
-const initialFormData = {
-  clientName: "",
-  pickupLocation: "",
-  dropoffLocation: "",
-  shipmentDate: "",
-  truckType: "",
-  negotiatedPrice: "",
-  commissionAmount: "",
-};
-
-const initialFilters = {
-  search: "",
-  status: "All",
-  assignment: "All",
-};
-
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
 const smallSelectClass =
@@ -38,6 +22,22 @@ const recommendationColors = {
   "Type match": "bg-blue-50 text-blue-700",
   "Location match": "bg-amber-50 text-amber-700",
   "Available fallback": "bg-slate-100 text-slate-700",
+};
+
+const initialFormData = {
+  clientName: "",
+  pickupLocation: "",
+  dropoffLocation: "",
+  shipmentDate: "",
+  truckType: "",
+  negotiatedPrice: "",
+  commissionAmount: "",
+};
+
+const initialFilters = {
+  search: "",
+  status: "All",
+  assignment: "All",
 };
 
 const getNextStatusOptions = (status) => {
@@ -87,6 +87,86 @@ const Badge = ({ text, colorClass }) => (
   </span>
 );
 
+const ShipmentModal = ({
+  isOpen,
+  mode,
+  formData,
+  onChange,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-xl font-semibold">
+              {mode === "edit" ? "Edit Shipment" : "Create Shipment"}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {mode === "edit"
+                ? "Update shipment details while keeping workflow controls separate."
+                : "Submit a new shipment request. New shipments start as Pending."}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Close
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <input className={inputClass} name="clientName" placeholder="Client name" value={formData.clientName} onChange={onChange} />
+          <input className={inputClass} name="pickupLocation" placeholder="Pickup location" value={formData.pickupLocation} onChange={onChange} />
+          <input className={inputClass} name="dropoffLocation" placeholder="Dropoff location" value={formData.dropoffLocation} onChange={onChange} />
+          <input className={inputClass} type="date" name="shipmentDate" value={formData.shipmentDate} onChange={onChange} />
+          <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
+          <input className={inputClass} type="number" name="negotiatedPrice" placeholder="Negotiated price (BDT)" value={formData.negotiatedPrice} onChange={onChange} />
+          <input className={inputClass} type="number" name="commissionAmount" placeholder="Commission amount (BDT)" value={formData.commissionAmount} onChange={onChange} />
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Initial Status
+            </p>
+            <p className="mt-1 text-sm font-semibold text-amber-700">Pending</p>
+          </div>
+
+          <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
+            <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
+              {error || "Prices are stored in BDT and shown in your selected currency."}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Create Shipment"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export default function Shipments() {
   const storedUser = localStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
@@ -96,8 +176,11 @@ export default function Shipments() {
   const [recommendedTrucksByShipment, setRecommendedTrucksByShipment] = useState({});
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState("BDT");
-  const [formData, setFormData] = useState(initialFormData);
   const [filters, setFilters] = useState(initialFilters);
+  const [modalMode, setModalMode] = useState("create");
+  const [shipmentForm, setShipmentForm] = useState(initialFormData);
+  const [editingShipmentId, setEditingShipmentId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState(null);
@@ -125,7 +208,7 @@ export default function Shipments() {
     }
 
     const pending = shipmentList.filter(
-      (s) => s.status === "Pending" && !s.assignedTruckCode
+      (shipment) => shipment.status === "Pending" && !shipment.assignedTruckCode
     );
 
     const results = await Promise.all(
@@ -172,31 +255,77 @@ export default function Shipments() {
     });
   }, [shipments, filters]);
 
-  const handleFormChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const openCreateModal = () => {
+    setModalMode("create");
+    setEditingShipmentId(null);
+    setShipmentForm(initialFormData);
+    setFormError("");
+    setIsModalOpen(true);
+  };
 
-  const handleFilterChange = (e) =>
-    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const openEditModal = (shipment) => {
+    setModalMode("edit");
+    setEditingShipmentId(shipment.id);
+    setShipmentForm({
+      clientName: shipment.clientName,
+      pickupLocation: shipment.pickupLocation,
+      dropoffLocation: shipment.dropoffLocation,
+      shipmentDate: shipment.shipmentDate,
+      truckType: shipment.truckType,
+      negotiatedPrice: shipment.negotiatedPrice,
+      commissionAmount: shipment.commissionAmount,
+    });
+    setFormError("");
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormError("");
+    setEditingShipmentId(null);
+    setShipmentForm(initialFormData);
+  };
+
+  const handleShipmentFormChange = (e) => {
+    setShipmentForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleFilterChange = (e) => {
+    setFilters((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
 
   const clearFilters = () => setFilters(initialFilters);
 
-  const handleSubmit = async (e) => {
+  const handleShipmentSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setFormError("");
 
     try {
-      await api.post("/api/shipments", {
-        ...formData,
+      const payload = {
+        ...shipmentForm,
         status: "Pending",
-        negotiatedPrice: Number(formData.negotiatedPrice),
-        commissionAmount: Number(formData.commissionAmount),
-      });
-      setFormData(initialFormData);
+        negotiatedPrice: Number(shipmentForm.negotiatedPrice),
+        commissionAmount: Number(shipmentForm.commissionAmount),
+      };
+
+      if (modalMode === "edit" && editingShipmentId) {
+        await api.put(`/api/shipments/${editingShipmentId}`, payload);
+      } else {
+        await api.post("/api/shipments", payload);
+      }
+
+      closeModal();
       await loadPageData();
     } catch (error) {
-      console.error("Error creating shipment:", error);
-      setFormError(error.response?.data?.error || "Failed to create shipment");
+      console.error("Error saving shipment:", error);
+      setFormError(error.response?.data?.error || "Failed to save shipment");
     } finally {
       setSubmitting(false);
     }
@@ -257,60 +386,33 @@ export default function Shipments() {
             <h1 className="text-3xl font-bold">Shipments</h1>
             <p className="mt-2 text-slate-600">
               {isAdmin
-                ? "Manage shipment requests, assign trucks, and control workflow operations across the brokerage platform."
+                ? "Manage shipment requests, assign trucks, update operations, and maintain workflow control."
                 : "Create shipment requests and track the progress of your logistics workflow."}
             </p>
           </div>
 
-          <Field label="Display Currency">
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full min-w-[180px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm outline-none focus:border-blue-500"
-            >
-              <option value="BDT">BDT</option>
-              <option value="CAD">CAD</option>
-              <option value="USD">USD</option>
-            </select>
-          </Field>
-        </div>
-
-        <Card
-          title="Create Shipment"
-          subtitle="Submit a new shipment request. New shipments enter the workflow as Pending and can be assigned later by operations."
-          className="mb-8"
-        >
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <input className={inputClass} name="clientName" placeholder="Client name" value={formData.clientName} onChange={handleFormChange} />
-            <input className={inputClass} name="pickupLocation" placeholder="Pickup location" value={formData.pickupLocation} onChange={handleFormChange} />
-            <input className={inputClass} name="dropoffLocation" placeholder="Dropoff location" value={formData.dropoffLocation} onChange={handleFormChange} />
-            <input className={inputClass} type="date" name="shipmentDate" value={formData.shipmentDate} onChange={handleFormChange} />
-            <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={handleFormChange} />
-            <input className={inputClass} type="number" name="negotiatedPrice" placeholder="Negotiated price (BDT)" value={formData.negotiatedPrice} onChange={handleFormChange} />
-            <input className={inputClass} type="number" name="commissionAmount" placeholder="Commission amount (BDT)" value={formData.commissionAmount} onChange={handleFormChange} />
-
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Initial Status
-              </p>
-              <p className="mt-1 text-sm font-semibold text-amber-700">Pending</p>
-            </div>
-
-            <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-4 md:flex-row md:items-center md:justify-between">
-              <p className={`text-sm ${formError ? "font-medium text-red-600" : "text-slate-500"}`}>
-                {formError || "Prices are stored in BDT and displayed in your selected currency."}
-              </p>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <Field label="Display Currency">
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="min-w-[180px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium shadow-sm outline-none focus:border-blue-500"
               >
-                {submitting ? "Creating..." : "Create Shipment"}
-              </button>
-            </div>
-          </form>
-        </Card>
+                <option value="BDT">BDT</option>
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
+              </select>
+            </Field>
+
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Create Shipment
+            </button>
+          </div>
+        </div>
 
         <Card
           title="Search & Filters"
@@ -356,7 +458,7 @@ export default function Shipments() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Clear Filters
               </button>
@@ -470,7 +572,10 @@ export default function Shipments() {
                       <td className="px-6 py-4">
                         {isAdmin ? (
                           <div className="flex items-center gap-2">
-                            <Badge text={shipment.status} colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"} />
+                            <Badge
+                              text={shipment.status}
+                              colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"}
+                            />
                             <select
                               value={shipment.status}
                               onChange={(e) =>
@@ -485,7 +590,10 @@ export default function Shipments() {
                             </select>
                           </div>
                         ) : (
-                          <Badge text={shipment.status} colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"} />
+                          <Badge
+                            text={shipment.status}
+                            colorClass={statusColors[shipment.status] || "bg-slate-100 text-slate-700"}
+                          />
                         )}
                       </td>
 
@@ -494,13 +602,21 @@ export default function Shipments() {
 
                       {isAdmin && (
                         <td className="px-6 py-4">
-                          <button
-                            onClick={() => handleDelete(shipment.id)}
-                            disabled={deletingId === shipment.id}
-                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
-                          >
-                            {deletingId === shipment.id ? "Deleting..." : "Delete"}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => openEditModal(shipment)}
+                              className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDelete(shipment.id)}
+                              disabled={deletingId === shipment.id}
+                              className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {deletingId === shipment.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -510,6 +626,17 @@ export default function Shipments() {
             </table>
           </div>
         )}
+
+        <ShipmentModal
+          isOpen={isModalOpen}
+          mode={modalMode}
+          formData={shipmentForm}
+          onChange={handleShipmentFormChange}
+          onClose={closeModal}
+          onSubmit={handleShipmentSubmit}
+          submitting={submitting}
+          error={formError}
+        />
       </main>
     </div>
   );

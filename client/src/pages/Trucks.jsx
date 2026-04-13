@@ -2,6 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import api from "../services/api";
 
+const inputClass =
+  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
+const smallSelectClass =
+  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70";
+
 const initialFormData = {
   truckCode: "",
   driverName: "",
@@ -17,11 +22,6 @@ const initialFilters = {
 };
 
 const availabilityOptions = ["Available", "Assigned", "Unavailable"];
-
-const inputClass =
-  "w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500";
-const smallSelectClass =
-  "rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs outline-none focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-70";
 
 const availabilityColors = {
   Available: "bg-emerald-50 text-emerald-700",
@@ -57,19 +57,101 @@ const Badge = ({ text, colorClass }) => (
   </span>
 );
 
+const TruckModal = ({
+  isOpen,
+  mode,
+  formData,
+  onChange,
+  onClose,
+  onSubmit,
+  submitting,
+  error,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+      <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <h3 className="text-xl font-semibold">
+              {mode === "edit" ? "Edit Truck" : "Add Truck"}
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              {mode === "edit"
+                ? "Update truck details and operational availability."
+                : "Register an external truck for brokerage assignment and tracking."}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100"
+          >
+            Close
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <input className={inputClass} name="truckCode" placeholder="Truck identifier (e.g., TRK-1001)" value={formData.truckCode} onChange={onChange} />
+          <input className={inputClass} name="driverName" placeholder="Driver name" value={formData.driverName} onChange={onChange} />
+          <input className={inputClass} name="truckType" placeholder="Truck type" value={formData.truckType} onChange={onChange} />
+          <input className={inputClass} name="currentLocation" placeholder="Current location" value={formData.currentLocation} onChange={onChange} />
+
+          <select className={inputClass} name="availabilityStatus" value={formData.availabilityStatus} onChange={onChange}>
+            {availabilityOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </select>
+
+          <input className={inputClass} type="number" step="0.01" name="capacityTons" placeholder="Capacity (tons)" value={formData.capacityTons} onChange={onChange} />
+
+          <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-3 md:flex-row md:items-center md:justify-between">
+            <p className={`text-sm ${error ? "font-medium text-red-600" : "text-slate-500"}`}>
+              {error || "Keep truck identifiers unique so every external vehicle can be tracked clearly."}
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {submitting ? "Saving..." : mode === "edit" ? "Save Changes" : "Add Truck"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export default function Trucks() {
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState(initialFormData);
   const [filters, setFilters] = useState(initialFilters);
+  const [truckForm, setTruckForm] = useState(initialFormData);
+  const [modalMode, setModalMode] = useState("create");
+  const [editingTruckId, setEditingTruckId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [updatingTruckId, setUpdatingTruckId] = useState(null);
+  const [deletingTruckId, setDeletingTruckId] = useState(null);
 
   const fetchTrucks = async () => {
     try {
-      const res = await api.get("/api/trucks");
-      setTrucks(res.data);
+      const response = await api.get("/api/trucks");
+      setTrucks(response.data);
     } catch (error) {
       console.error("Error fetching trucks:", error);
     } finally {
@@ -100,29 +182,74 @@ export default function Trucks() {
     });
   }, [trucks, filters]);
 
-  const handleFormChange = (e) =>
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const openCreateModal = () => {
+    setModalMode("create");
+    setEditingTruckId(null);
+    setTruckForm(initialFormData);
+    setFormError("");
+    setIsModalOpen(true);
+  };
 
-  const handleFilterChange = (e) =>
-    setFilters((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  const openEditModal = (truck) => {
+    setModalMode("edit");
+    setEditingTruckId(truck.id);
+    setTruckForm({
+      truckCode: truck.truckCode,
+      driverName: truck.driverName,
+      truckType: truck.truckType,
+      currentLocation: truck.currentLocation,
+      availabilityStatus: truck.availabilityStatus,
+      capacityTons: truck.capacityTons,
+    });
+    setFormError("");
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setTruckForm(initialFormData);
+    setEditingTruckId(null);
+    setFormError("");
+  };
+
+  const handleTruckFormChange = (e) => {
+    setTruckForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleFilterChange = (e) => {
+    setFilters((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
 
   const clearFilters = () => setFilters(initialFilters);
 
-  const handleSubmit = async (e) => {
+  const handleTruckSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setFormError("");
 
     try {
-      await api.post("/api/trucks", {
-        ...formData,
-        capacityTons: Number(formData.capacityTons),
-      });
-      setFormData(initialFormData);
+      const payload = {
+        ...truckForm,
+        capacityTons: Number(truckForm.capacityTons),
+      };
+
+      if (modalMode === "edit" && editingTruckId) {
+        await api.put(`/api/trucks/${editingTruckId}`, payload);
+      } else {
+        await api.post("/api/trucks", payload);
+      }
+
+      closeModal();
       await fetchTrucks();
     } catch (error) {
-      console.error("Error creating truck:", error);
-      setFormError(error.response?.data?.error || "Failed to create truck");
+      console.error("Error saving truck:", error);
+      setFormError(error.response?.data?.error || "Failed to save truck");
     } finally {
       setSubmitting(false);
     }
@@ -140,87 +267,41 @@ export default function Trucks() {
     }
   };
 
+  const handleDeleteTruck = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this truck?")) return;
+
+    try {
+      setDeletingTruckId(id);
+      await api.delete(`/api/trucks/${id}`);
+      await fetchTrucks();
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to delete truck");
+    } finally {
+      setDeletingTruckId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
       <Header />
 
       <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Trucks</h1>
-          <p className="mt-2 text-slate-600">
-            Manage external truck records, driver details, availability, and operational readiness.
-          </p>
+        <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Trucks</h1>
+            <p className="mt-2 text-slate-600">
+              Manage external truck records, driver details, availability, and operational readiness.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Add Truck
+          </button>
         </div>
-
-        <Card
-          title="Add Truck"
-          subtitle="Register an external truck for brokerage assignment and availability tracking."
-          className="mb-8"
-        >
-          <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <input
-              className={inputClass}
-              name="truckCode"
-              placeholder="Truck identifier (e.g., TRK-1001)"
-              value={formData.truckCode}
-              onChange={handleFormChange}
-            />
-            <input
-              className={inputClass}
-              name="driverName"
-              placeholder="Driver name"
-              value={formData.driverName}
-              onChange={handleFormChange}
-            />
-            <input
-              className={inputClass}
-              name="truckType"
-              placeholder="Truck type"
-              value={formData.truckType}
-              onChange={handleFormChange}
-            />
-            <input
-              className={inputClass}
-              name="currentLocation"
-              placeholder="Current location"
-              value={formData.currentLocation}
-              onChange={handleFormChange}
-            />
-            <select
-              className={inputClass}
-              name="availabilityStatus"
-              value={formData.availabilityStatus}
-              onChange={handleFormChange}
-            >
-              {availabilityOptions.map((option) => (
-                <option key={option} value={option}>{option}</option>
-              ))}
-            </select>
-            <input
-              className={inputClass}
-              type="number"
-              step="0.01"
-              name="capacityTons"
-              placeholder="Capacity (tons)"
-              value={formData.capacityTons}
-              onChange={handleFormChange}
-            />
-
-            <div className="flex flex-col gap-3 md:col-span-2 xl:col-span-3 md:flex-row md:items-center md:justify-between">
-              <p className={`text-sm ${formError ? "font-medium text-red-600" : "text-slate-500"}`}>
-                {formError || "Keep truck identifiers unique so each external vehicle can be tracked clearly."}
-              </p>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {submitting ? "Adding..." : "Add Truck"}
-              </button>
-            </div>
-          </form>
-        </Card>
 
         <Card
           title="Search & Filters"
@@ -262,7 +343,7 @@ export default function Trucks() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Clear Filters
               </button>
@@ -296,6 +377,7 @@ export default function Trucks() {
                   <th className="px-6 py-3">Current Location</th>
                   <th className="px-6 py-3">Availability</th>
                   <th className="px-6 py-3">Capacity (tons)</th>
+                  <th className="px-6 py-3">Actions</th>
                 </tr>
               </thead>
 
@@ -310,7 +392,9 @@ export default function Trucks() {
                       <div className="flex items-center gap-2">
                         <Badge
                           text={truck.availabilityStatus}
-                          colorClass={availabilityColors[truck.availabilityStatus] || "bg-slate-100 text-slate-700"}
+                          colorClass={
+                            availabilityColors[truck.availabilityStatus] || "bg-slate-100 text-slate-700"
+                          }
                         />
                         <select
                           value={truck.availabilityStatus}
@@ -325,12 +409,40 @@ export default function Trucks() {
                       </div>
                     </td>
                     <td className="px-6 py-4">{truck.capacityTons}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openEditModal(truck)}
+                          className="rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTruck(truck.id)}
+                          disabled={deletingTruckId === truck.id}
+                          className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {deletingTruckId === truck.id ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+
+        <TruckModal
+          isOpen={isModalOpen}
+          mode={modalMode}
+          formData={truckForm}
+          onChange={handleTruckFormChange}
+          onClose={closeModal}
+          onSubmit={handleTruckSubmit}
+          submitting={submitting}
+          error={formError}
+        />
       </main>
     </div>
   );

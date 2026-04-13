@@ -75,24 +75,17 @@ const createShipment = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (
-      Number.isNaN(Number(negotiatedPrice)) ||
-      Number.isNaN(Number(commissionAmount))
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Price and commission must be valid numbers" });
+    if (Number.isNaN(Number(negotiatedPrice)) || Number.isNaN(Number(commissionAmount))) {
+      return res.status(400).json({ error: "Price and commission must be valid numbers" });
     }
 
     const allowedStatuses = ["Pending", "Assigned", "In Transit", "Completed"];
-
     let finalStatus = "Pending";
 
     if (req.user.role === "admin" && status) {
       if (!allowedStatuses.includes(status)) {
         return res.status(400).json({ error: "Invalid shipment status" });
       }
-
       finalStatus = status;
     }
 
@@ -143,7 +136,7 @@ const createShipment = async (req, res) => {
   }
 };
 
-const updateShipmentDetails = async (req, res) => {
+const updateShipment = async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -172,18 +165,9 @@ const updateShipmentDetails = async (req, res) => {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (
-      Number.isNaN(Number(negotiatedPrice)) ||
-      Number.isNaN(Number(commissionAmount))
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Price and commission must be valid numbers" });
-    }
-
     const existingShipment = await pool.query(
       `
-      SELECT id, status, assigned_truck_id, truck_type
+      SELECT id
       FROM shipments
       WHERE id = $1
       `,
@@ -192,24 +176,6 @@ const updateShipmentDetails = async (req, res) => {
 
     if (existingShipment.rowCount === 0) {
       return res.status(404).json({ error: "Shipment not found" });
-    }
-
-    const shipment = existingShipment.rows[0];
-
-    if (shipment.status === "Completed") {
-      return res
-        .status(400)
-        .json({ error: "Completed shipments cannot be edited" });
-    }
-
-    if (
-      shipment.assigned_truck_id &&
-      truckType.trim() !== shipment.truck_type.trim()
-    ) {
-      return res.status(400).json({
-        error:
-          "Cannot change truck type while a truck is assigned. Unassign first or keep the same truck type.",
-      });
     }
 
     const result = await pool.query(
@@ -251,8 +217,8 @@ const updateShipmentDetails = async (req, res) => {
 
     res.json(result.rows[0]);
   } catch (error) {
-    console.error("Error updating shipment details:", error.message);
-    res.status(500).json({ error: "Failed to update shipment details" });
+    console.error("Error updating shipment:", error.message);
+    res.status(500).json({ error: "Failed to update shipment" });
   }
 };
 
@@ -294,12 +260,6 @@ const updateShipmentStatus = async (req, res) => {
     if (!allowedTransitions[currentStatus].includes(status)) {
       return res.status(400).json({
         error: `Cannot change shipment status from ${currentStatus} to ${status}`,
-      });
-    }
-
-    if (status === "Assigned" && !assignedTruckId) {
-      return res.status(400).json({
-        error: "A truck must be assigned before moving shipment to Assigned",
       });
     }
 
@@ -357,7 +317,7 @@ const assignTruckToShipment = async (req, res) => {
 
     const shipmentResult = await client.query(
       `
-      SELECT id, status, assigned_truck_id, truck_type
+      SELECT id, status, assigned_truck_id
       FROM shipments
       WHERE id = $1
       `,
@@ -387,7 +347,7 @@ const assignTruckToShipment = async (req, res) => {
 
     const truckResult = await client.query(
       `
-      SELECT id, availability_status, truck_type
+      SELECT id, availability_status
       FROM trucks
       WHERE id = $1
       `,
@@ -399,18 +359,9 @@ const assignTruckToShipment = async (req, res) => {
       return res.status(404).json({ error: "Truck not found" });
     }
 
-    const truck = truckResult.rows[0];
-
-    if (truck.availability_status !== "Available") {
+    if (truckResult.rows[0].availability_status !== "Available") {
       await client.query("ROLLBACK");
       return res.status(400).json({ error: "Selected truck is not available" });
-    }
-
-    if (truck.truck_type.trim() !== shipment.truck_type.trim()) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: "Selected truck type does not match shipment truck type",
-      });
     }
 
     await client.query(
@@ -443,89 +394,11 @@ const assignTruckToShipment = async (req, res) => {
     );
 
     await client.query("COMMIT");
-
     res.json(updatedShipment.rows[0]);
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error assigning truck:", error.message);
     res.status(500).json({ error: "Failed to assign truck to shipment" });
-  } finally {
-    client.release();
-  }
-};
-
-const unassignTruckFromShipment = async (req, res) => {
-  const client = await pool.connect();
-
-  try {
-    const { id } = req.params;
-
-    await client.query("BEGIN");
-
-    const shipmentResult = await client.query(
-      `
-      SELECT id, status, assigned_truck_id
-      FROM shipments
-      WHERE id = $1
-      `,
-      [id]
-    );
-
-    if (shipmentResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-      return res.status(404).json({ error: "Shipment not found" });
-    }
-
-    const shipment = shipmentResult.rows[0];
-
-    if (!shipment.assigned_truck_id) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({ error: "Shipment has no assigned truck" });
-    }
-
-    if (shipment.status === "In Transit" || shipment.status === "Completed") {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: "Cannot unassign truck from a shipment already in transit or completed",
-      });
-    }
-
-    await client.query(
-      `
-      UPDATE shipments
-      SET assigned_truck_id = NULL,
-          status = 'Pending'
-      WHERE id = $1
-      `,
-      [id]
-    );
-
-    await client.query(
-      `
-      UPDATE trucks
-      SET availability_status = 'Available'
-      WHERE id = $1
-      `,
-      [shipment.assigned_truck_id]
-    );
-
-    const updatedShipment = await client.query(
-      `
-      SELECT ${shipmentSelectFields}
-      FROM shipments s
-      LEFT JOIN trucks t ON s.assigned_truck_id = t.id
-      WHERE s.id = $1
-      `,
-      [id]
-    );
-
-    await client.query("COMMIT");
-
-    res.json(updatedShipment.rows[0]);
-  } catch (error) {
-    await client.query("ROLLBACK");
-    console.error("Error unassigning truck:", error.message);
-    res.status(500).json({ error: "Failed to unassign truck from shipment" });
   } finally {
     client.release();
   }
@@ -580,7 +453,6 @@ const getRecommendedTrucksForShipment = async (req, res) => {
         END AS recommendation_rank
       FROM trucks
       WHERE availability_status = 'Available'
-        AND truck_type = $1
       ORDER BY recommendation_rank ASC, id DESC
       `,
       [shipment.truck_type, shipment.pickup_location]
@@ -637,7 +509,6 @@ const deleteShipment = async (req, res) => {
     }
 
     await client.query("COMMIT");
-
     res.json({ message: "Shipment deleted successfully" });
   } catch (error) {
     await client.query("ROLLBACK");
@@ -651,10 +522,9 @@ const deleteShipment = async (req, res) => {
 module.exports = {
   getAllShipments,
   createShipment,
-  updateShipmentDetails,
+  updateShipment,
   updateShipmentStatus,
   assignTruckToShipment,
-  unassignTruckFromShipment,
   getRecommendedTrucksForShipment,
   deleteShipment,
 };
