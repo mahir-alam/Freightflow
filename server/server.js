@@ -9,6 +9,7 @@ const shipmentRoutes = require("./routes/shipmentRoutes");
 const truckRoutes = require("./routes/truckRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const healthRoutes = require("./routes/healthRoutes");
+const demoRoutes = require("./routes/demoRoutes");
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/shipments", shipmentRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/demo", demoRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
