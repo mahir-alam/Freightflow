@@ -43,8 +43,8 @@ export default function Login() {
 
     try {
       const response = await api.post("/api/auth/login", {
-        email: "admin@freightflow.com",
-        password: "admin123",
+        email: "demo@freightflow.com",
+        password: "demo123",
       });
 
       localStorage.setItem("token", response.data.token);
@@ -214,7 +214,7 @@ export default function Login() {
               <div className="mt-6 rounded-2xl bg-slate-50 p-4">
                 <p className="text-sm text-slate-600">
                   Select a role above to load the appropriate access profile, or
-                  use quick access to preview the full operations platform.
+                  use quick demo access to preview the full operations platform.
                 </p>
               </div>
             </div>
