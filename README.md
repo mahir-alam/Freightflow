@@ -39,39 +39,26 @@ Data-driven logistics brokerage platform for managing shipment operations, truck
 
 ### 🚀 Login & Demo Access
 <p align="center">
-  <img src="docs/screenshots/1.Login.png" width="70%"/>
+  <img src="docs/1.Login.png" width="70%"/>
 </p>
 
 ### 📊 Dashboard Overview
 <p align="center">
-  <img src="docs/2.Dashboard.png" width="70%"/>
+  <img src="docs/2.Dashboard.png" width="48%"/>
+  <img src="docs/3.Dashboard.png" width="48%"/>
 </p>
 
+### 📦 Shipment & Truck Operations
 <p align="center">
-  <img src="docs/3.Dashboard.png" width="70%"/>
-</p>
-
-### 📦 Shipment Management
-<p align="center">
-  <img src="docs/4.Shipment.png" width="70%"/>
-</p>
-
-### 🚛 Truck Operations
-<p align="center">
-  <img src="docs/5.Trucks.png" width="70%"/>
+  <img src="docs/4.Shipment.png" width="48%"/>
+  <img src="docs/5.Trucks.png" width="48%"/>
 </p>
 
 ### 📈 Analytics & Insights
 <p align="center">
-  <img src="docs/6.Analytics.png" width="70%"/>
-</p>
-
-<p align="center">
-  <img src="docs/7.Analytics.png" width="70%"/>
-</p>
-
-<p align="center">
-  <img src="docs/8.Analytics.png" width="70%"/>
+  <img src="docs/6.Analytics.png" width="32%"/>
+  <img src="docs/7.Analytics.png" width="32%"/>
+  <img src="docs/8.Analytics.png" width="32%"/>
 </p>
 
 ---
@@ -81,7 +68,7 @@ Data-driven logistics brokerage platform for managing shipment operations, truck
 ### Clone Repo
 
 ```bash
-git clone [paste your GitHub repo link here]
+git clone https://github.com/mahir-alam/Freightflow.git
 cd Freightflow
 
 Backend
