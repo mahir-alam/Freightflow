@@ -386,18 +386,6 @@ VALUES
     (SELECT id FROM users WHERE email = 'client@freightflow.com' LIMIT 1)
   ),
   (
-    'fbf',
-    'fd',
-    'bf',
-    '2026-04-10',
-    'tyjyt',
-    'Pending',
-    22222,
-    2222,
-    NULL,
-    (SELECT id FROM users WHERE email = 'client@freightflow.com' LIMIT 1)
-  ),
-  (
     'Demo Retail BD',
     'Dhaka',
     'Rajshahi',
